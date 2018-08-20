@@ -62,8 +62,8 @@ BEGIN
    ,`pattern_Length_Maximum` AS `lengthMaximum`
    ,`pattern_Value_Minimum` AS `valueMinimum`
    ,`pattern_Value_Maximum` AS `valueMinimum`
-  FROM `hpapi_column`
-  LEFT JOIN `hpapi_pattern`
+  FROM `hpapi_dba_column`
+  LEFT JOIN `hpapi_dba_pattern`
          ON `pattern_Pattern`=`column_Pattern`
   WHERE `column_Model`=columnModel
     AND `column_Table`=columnTable
@@ -75,26 +75,43 @@ END$$
 
 
 
--- GRANT PERMISSION
+-- ALLOW GRANTING
 
-DROP PROCEDURE IF EXISTS `hpapiDbaGrant`$$
-CREATE PROCEDURE `hpapiDbaGrant`(
-  IN        `grantType` VARCHAR(64) CHARSET ascii
- ,IN        `userUUID` CHAR(52) CHARSET ascii
+DROP PROCEDURE IF EXISTS `hpapiDbaGrantAllowed`$$
+CREATE PROCEDURE `hpapiDbaGrantAllowed`(
+  IN        `userUUID` CHAR(52) CHARSET ascii
+ ,IN        `grantType` VARCHAR(64) CHARSET ascii
+ ,IN        `membershipUsergroup` VARCHAR(64) CHARSET ascii
 )
 BEGIN
   SELECT
-    `grant_Expression` AS `expression`
-  FROM `hpapi_grant`
-  LEFT JOIN `hpapi_membership`
-         ON `membership_Usergroup`=`grant_Usergroup`
-        AND `membership_User_UUID`=userUUID
-  WHERE `grant_Type`=grantType
-    AND `membership_User_UUID` IS NOT NULL
+    COUNT(`grant_Level`)>0 AS `allowed`
+  FROM `hpapi_dba_grant`
+  INNER JOIN `hpapi_membership`
+          ON `membership_Usergroup`=`grant_Usergroup`
+  INNER JOIN `hpapi_usergroup` AS `granter`
+          ON `granter`.`usergroup_Usergroup`=`membership_Usergroup`
+  INNER JOIN `hpapi_usergroup` AS `grantee`
+          ON `grantee`.`usergroup_Usergroup`=`membership_Usergroup`
+  WHERE `membership_User_UUID`=userUUID
+    AND `grant_Type`=grantType
+    AND (
+      (
+           grantType='call'
+      )
+      OR (
+           grantType!='call'
+           `grant_Level`='0'
+       AND `grant_Usergroup`=`granter`.`membership_Usergroup`
+      )
+      OR (
+           grantType!='call'
+           `grant_Level`!='0'
+       AND `grant_Level`<=`grantee`.`usergroup_Level`
+      )
+    )
   ;
 END$$
-
-
 
 
 

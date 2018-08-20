@@ -30,12 +30,13 @@ Base properties:
 
     // GRANT PERMISSIONS
 
-    public function grantAllowed ($type,$match) {
+    public function grantAllowed ($type,$usergroup='') {
         try {
             $this->hpapi->dbCall (
-                'hpapiDbaGrant'
-               ,$type
+                'hpapiDbaGrantAllowed'
                ,$this->userUUID
+               ,$type
+               ,$usergroup
             );
         }
         catch (\Exception $e) {
@@ -46,14 +47,14 @@ Base properties:
             if (preg_match($gtr['expression'],$match)) {
                 return true;
             }
-            return false;
         }
+        return false;
     }
 
     // ADMINISTRATE ACCESS TO USER GROUPS
 
     public function grantUsergroupToUser ($usergroup,$user_uuid) {
-        if (!$this->grantAllowed('membership-usergroup',$usergroup)) {
+        if (!$this->grantAllowed('membership',$usergroup)) {
             throw new \Exception (HPAPI_STR_DBA_GRANT_ALLOW);
             return false;
         }
@@ -72,13 +73,13 @@ Base properties:
     }
 
     public function revokeUsergroupFromUser ($usergroup,$user_uuid) {
-        if (!$this->grantAllowed('membership-usergroup',$usergroup)) {
+        if (!$this->grantAllowed('membership',$usergroup)) {
             throw new \Exception (HPAPI_STR_DBA_GRANT_ALLOW);
             return false;
         }
         try {
             $this->hpapi->dbCall (
-                'hpapiDbaMembershipInsert'
+                'hpapiDbaMembershipDelete'
                ,$usergroup
                ,$user_uuid
             );
@@ -121,7 +122,7 @@ Base properties:
     // ADMINISTRATE ACCESS TO METHODS
 
     public function grantMethodToUsergroup ($vendor,$package,$class,$method,$usergroup) {
-        if (!$this->grantAllowed('run-usergroup',$usergroup)) {
+        if (!$this->grantAllowed('run',$usergroup)) {
             throw new \Exception (HPAPI_STR_DBA_GRANT_ALLOW);
             return false;
         }
@@ -143,7 +144,7 @@ Base properties:
     }
 
     public function revokeMethodFromUsergroup ($vendor,$package,$class,$method,$usergroup) {
-        if (!$this->grantAllowed('run-usergroup',$usergroup)) {
+        if (!$this->grantAllowed('run',$usergroup)) {
             throw new \Exception (HPAPI_STR_DBA_GRANT_ALLOW);
             return false;
         }
@@ -198,7 +199,7 @@ Base properties:
     // ADMINISTRATE ACCESS TO STORED PROCEDURES
 
     public function grantSprToMethod ($model,$spr,$vendor,$package,$class,$method) {
-        if (!$this->grantAllowed('call-model.spr',$model.'.'.$spr)) {
+        if (!$this->grantAllowed('call')) {
             throw new \Exception (HPAPI_STR_DBA_GRANT_ALLOW);
             return false;
         }
@@ -221,7 +222,7 @@ Base properties:
     }
 
     public function revokeSprFromMethod ($model,$spr,$vendor,$package,$class,$method) {
-        if (!$this->grantAllowed('call-model.spr',$model.'.'.$spr)) {
+        if (!$this->grantAllowed('call')) {
             throw new \Exception (HPAPI_STR_DBA_GRANT_ALLOW);
             return false;
         }
@@ -278,7 +279,7 @@ Base properties:
     // ADMINISTRATE PERMISSION TO INSERT
 
     public function grantInsertToUsergroup ($model,$table,$usergroup) {
-        if (!$this->grantAllowed('insert-usergroup',$usergroup)) {
+        if (!$this->grantAllowed('insert',$usergroup)) {
             throw new \Exception (HPAPI_STR_DBA_GRANT_ALLOW);
             return false;
         }
@@ -298,7 +299,7 @@ Base properties:
     }
 
     public function revokeInsertFromUsergroup ($model,$table,$usergroup) {
-        if (!$this->grantAllowed('insert-usergroup',$usergroup)) {
+        if (!$this->grantAllowed('insert',$usergroup)) {
             throw new \Exception (HPAPI_STR_DBA_GRANT_ALLOW);
             return false;
         }
@@ -336,7 +337,7 @@ Base properties:
     // ADMINISTRATE PERMISSION TO UPDATE
 
     public function grantUpdateToUsergroup ($model,$table,$column,$usergroup) {
-        if (!$this->grantAllowed('update-usergroup',$usergroup)) {
+        if (!$this->grantAllowed('update',$usergroup)) {
             throw new \Exception (HPAPI_STR_DBA_GRANT_ALLOW);
             return false;
         }
@@ -357,7 +358,7 @@ Base properties:
     }
 
     public function revokeUpdateFromUsergroup ($model,$table,$column,$usergroup) {
-        if (!$this->grantAllowed('update-usergroup',$usergroup)) {
+        if (!$this->grantAllowed('update',$usergroup)) {
             throw new \Exception (HPAPI_STR_DBA_GRANT_ALLOW);
             return false;
         }
@@ -396,7 +397,7 @@ Base properties:
     // ADMINISTRATE PERMISSION TO TRASH
 
     public function grantTrashToUsergroup ($model,$table,$usergroup) {
-        if (!$this->grantAllowed('trash-usergroup',$usergroup)) {
+        if (!$this->grantAllowed('trash',$usergroup)) {
             throw new \Exception (HPAPI_STR_DBA_GRANT_ALLOW);
             return false;
         }
@@ -416,7 +417,7 @@ Base properties:
     }
 
     public function revokeTrashFromUsergroup ($model,$table,$usergroup) {
-        if (!$this->grantAllowed('trash-usergroup',$usergroup)) {
+        if (!$this->grantAllowed('trash',$usergroup)) {
             throw new \Exception (HPAPI_STR_DBA_GRANT_ALLOW);
             return false;
         }
@@ -435,12 +436,11 @@ Base properties:
         return true;
     }
 
-    public function showTrashesForUsergroup ($model,$table='*') {
+    public function showTrashesForUsergroup ($usergroup='*') {
         try {
             $trashes    = $this->hpapi->dbCall (
                 'hpapiDbaTrashesForUsergroup'
-               ,$model
-               ,$table
+               ,$usergroup
             );
         }
         catch (\Exception $e) {
