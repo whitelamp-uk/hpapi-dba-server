@@ -450,6 +450,58 @@ Base properties:
         return $trashes;
     }
 
+    // DESCRIBE DATA STRUCTURE
+
+    public function describeTable ($dbName,$tableName) {
+        try {
+            $columns            = $this->hpapi->dbCall (
+                'hpapiDbaColumnsForTable'
+               ,$model
+               ,$tableName
+               ,$tableName
+            );
+            $columns            = $this->hpapi->parse2D ($columns);
+        }
+        catch (\Exception $e) {
+            throw new \Exception ($e->getMessage());
+            return false;
+        }
+        $table                  = new \stdClass ();
+        $table->model           = $columns[0]->model;
+        $table->table           = $columns[0]->table;
+        $table->title           = $columns[0]->title;
+        $table->description     = $columns[0]->description;
+        $table->columns         = array ();
+        foreach ($columns as $c) {
+            unset ($c->title);
+            unset ($c->description);
+            array_push ($table->columns,$c);
+        }
+        return $table;
+    }
+
+    public function describeStrongRelations ($dbName,$tableName) {
+        try {
+            $relations          = $this->hpapi->dbCall (
+                'hpapiDbaStrongRelationsForTable'
+               ,$tableName
+            );
+            $relations          = $this->hpapi->parse2D ($relations);
+        }
+        catch (\Exception $e) {
+            throw new \Exception ($e->getMessage());
+            return false;
+        }
+        $strongs                = array ();
+        foreach ($relations as $r) {
+            if (!array_key_exists($r['constraint'],$strongs)) {
+                $strongs[$r['constraint']] = array ();
+            }
+            array_push ($strongs[$r['constraint']],$r);
+        }
+        return $strongs;
+    }
+
 }
 
 ?>

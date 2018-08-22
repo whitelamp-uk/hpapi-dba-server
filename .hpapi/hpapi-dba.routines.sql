@@ -7,74 +7,6 @@ SET time_zone = '+00:00';
 DELIMITER $$
 
 
-
-
--- COLUMN INFORMATION
-
-DROP PROCEDURE IF EXISTS `hpapiDbaColumnsInfo`$$
-CREATE PROCEDURE `hpapiDbaColumnsInfo`(
-  IN        `databaseName` VARCHAR(64) CHARSET ascii
- ,IN        `tableName` VARCHAR(64) CHARSET ascii
-)
-BEGIN
-  SELECT
-    `COLUMNS`.`TABLE_SCHEMA` AS `database`
-   ,`COLUMNS`.`TABLE_NAME` AS `table`
-   ,`COLUMNS`.`COLUMN_NAME` AS `column`
-   ,`COLUMNS`.`IS_NULLABLE` AS `emptyIsNull`
-   ,`COLUMNS`.`CHARACTER_MAXIMUM_LENGTH` AS `varcharLength`
-  FROM `INFORMATION_SCHEMA`.`COLUMNS`
-  LEFT JOIN `INFORMATION_SCHEMA`.`KEY_COLUMN_USAGE`
-         ON `KEY_COLUMN_USAGE`.`CONSTRAINT_NAME`='PRIMARY'
-        AND `KEY_COLUMN_USAGE`.`TABLE_CATALOG`=`COLUMNS`.`TABLE_CATALOG`
-        AND `KEY_COLUMN_USAGE`.`TABLE_SCHEMA`=`COLUMNS`.`TABLE_SCHEMA`
-        AND `KEY_COLUMN_USAGE`.`TABLE_NAME`=`COLUMNS`.`TABLE_NAME`
-        AND `KEY_COLUMN_USAGE`.`COLUMN_NAME`=`COLUMNS`.`COLUMN_NAME`
-  WHERE `COLUMNS`.`TABLE_CATALOG`='def'
-    AND `COLUMNS`.`TABLE_SCHEMA`=databaseName
-    AND `COLUMNS`.`TABLE_NAME`=tableName
-  ;
-END$$
-
-DROP PROCEDURE IF EXISTS `hpapiDbaColumnsDefn`$$
-CREATE PROCEDURE `hpapiDbaColumnsDefn`(
-  IN        `columnModel` VARCHAR(64) CHARSET ascii
- ,IN        `columnTable` VARCHAR(64) CHARSET ascii
- ,IN        `columnColumn` VARCHAR(64) CHARSET ascii
-)
-BEGIN
-  SELECT
-    `column_Model` AS `model`
-   ,`column_Table` AS `table`
-   ,`column_Column` AS `column`
-   ,`column_Heading` AS `heading`
-   ,`column_Hint` AS `hint`
-   ,`column_Means_Is_Readable` AS `meansIsVisible`
-   ,`column_Means_Is_Trashed` AS `meansIsTrashed`
-   ,`column_Means_Edited_Datetime` AS `meansEditedDatetime`
-   ,`column_Means_Editor_UUID` AS `meansEditorUUID`
-   ,`pattern_Pattern` AS `pattern`
-   ,`pattern_Constraints` AS `constraints`
-   ,`pattern_Expression` AS `expression`
-   ,`pattern_Input` AS `input`
-   ,`pattern_Php_Filter` AS `phpFilter`
-   ,`pattern_Length_Minimum` AS `lengthMinimum`
-   ,`pattern_Length_Maximum` AS `lengthMaximum`
-   ,`pattern_Value_Minimum` AS `valueMinimum`
-   ,`pattern_Value_Maximum` AS `valueMinimum`
-  FROM `hpapi_dba_column`
-  LEFT JOIN `hpapi_dba_pattern`
-         ON `pattern_Pattern`=`column_Pattern`
-  WHERE `column_Model`=columnModel
-    AND `column_Table`=columnTable
-    AND `column_Column`=columnColumn
-  ;
-END$$
-
-
-
-
-
 -- ALLOW GRANTING
 
 DROP PROCEDURE IF EXISTS `hpapiDbaGrantAllowed`$$
@@ -583,6 +515,92 @@ BEGIN
   ;
 END$$
 
+
+-- DATA STRUCTURE
+
+DROP PROCEDURE IF EXISTS `hpapiDbaColumnsForTable`$$
+CREATE PROCEDURE `hpapiDbaColumnsForTable`(
+  IN        `dbModel` VARCHAR(64) CHARSET ascii
+ ,IN        `dbName` VARCHAR(64) CHARSET ascii
+ ,IN        `tableName` VARCHAR(64) CHARSET ascii
+)
+BEGIN
+  SELECT
+    `table_Model` AS `model`
+   ,`table_Table` AS `table`
+   ,`table_Title` AS `title`
+   ,`table_Description` AS `description`
+   ,`column_Column` AS `column`
+   ,`CONSTRAINT_NAME` IS NOT NULL AS `isPrimary`
+   ,`column_Heading` AS `heading`
+   ,`column_Hint` AS `hint`
+   ,`column_Describes_Row` AS `describesRow`
+   ,`column_Means_Is_Trashed` AS `meansIsTrashed`
+   ,`column_Means_Edited_Datetime` AS `meansEditedDatetime`
+   ,`column_Means_Editor_UUID` AS `meansEditorUUID`
+   ,`IS_NULLABLE` AS `emptyIsNull`
+   ,`CHARACTER_MAXIMUM_LENGTH` AS `characterMaximumLength`
+   ,`pattern_Pattern` AS `pattern`
+   ,`pattern_Constraints` AS `constraints`
+   ,`pattern_Expression` AS `expression`
+   ,`pattern_Input` AS `input`
+   ,`pattern_Php_Filter` AS `phpFilter`
+   ,`pattern_Length_Minimum` AS `lengthMinimum`
+   ,`pattern_Length_Maximum` AS `lengthMaximum`
+   ,`pattern_Value_Minimum` AS `valueMinimum`
+   ,`pattern_Value_Maximum` AS `valueMinimum`
+  FROM `hpapi_dba_table`
+  INNER JOIN `hpapi_dba_column`
+          ON `column_Model`=`table_Model`
+         AND `column_Table`=`table_Table`
+  INNER JOIN `INFORMATION_SCHEMA`.`COLUMNS`
+          ON `COLUMNS`.`TABLE_SCHEMA`=dbName
+         AND `COLUMNS`.`TABLE_NAME`=`column_Table`
+         AND `COLUMNS`.`COLUMN_NAME`=`column_Column`
+  LEFT  JOIN `INFORMATION_SCHEMA`.`KEY_COLUMN_USAGE`
+          ON `KEY_COLUMN_USAGE`.`CONSTRAINT_NAME`='PRIMARY'
+         AND `KEY_COLUMN_USAGE`.`TABLE_CATALOG`=`COLUMNS`.`TABLE_CATALOG`
+         AND `KEY_COLUMN_USAGE`.`TABLE_SCHEMA`=`COLUMNS`.`TABLE_SCHEMA`
+         AND `KEY_COLUMN_USAGE`.`TABLE_NAME`=`COLUMNS`.`TABLE_NAME`
+         AND `KEY_COLUMN_USAGE`.`COLUMN_NAME`=`COLUMNS`.`COLUMN_NAME`
+  INNER JOIN `hpapi_dba_pattern`
+          ON `pattern_Pattern`=`column_Pattern`
+  WHERE `COLUMNS`.`TABLE_CATALOG`='def'
+    AND `column_Model`=dbModel
+    AND `column_Table`=tableName
+  GROUP BY `column_Model`,`column_Table`,`column_Column`
+  ORDER BY `column_Model`,`column_Table`,`ORDINAL POSITION`
+  ;
+END$$
+
+
+DROP PROCEDURE IF EXISTS `hpapiDbaStrongRelationsForTable`$$
+CREATE PROCEDURE `hpapiDbaStrongRelationsForTable`(
+  IN        `dbModel` VARCHAR(64) CHARSET ascii
+ ,IN        `dbName` VARCHAR(64) CHARSET ascii
+ ,IN        `tableName` VARCHAR(64) CHARSET ascii
+)
+BEGIN
+  SELECT
+    `CONSTRAINT_NAME` AS `constraint`
+   ,`COLUMN_NAME` AS `pointer`
+   ,`REFERENCED_TABLE_SCHEMA` AS `database`
+   ,`REFERENCED_TABLE_NAME` AS `table`
+   ,`REFERENCED_COLUMN_NAME` AS `describesRow`
+  FROM `INFORMATION_SCHEMA`.`KEY_COLUMN_USAGE`
+  WHERE `CONSTRAINT_NAME`='PRIMARY'
+    AND `TABLE_CATALOG`='def'
+    AND `TABLE_SCHEMA`=dbName
+    AND `TABLE_NAME`=tableName
+    AND `COLUMN_NAME`=`COLUMNS`.`COLUMN_NAME`
+    AND (
+        `REFERENCED_TABLE_SCHEMA`!=`TABLE_SCHEMA`
+     OR `REFERENCED_TABLE_NAME`!=`TABLE_NAME`
+    )
+  GROUP BY `column_Model`,`column_Table`,`column_Column`
+  ORDER BY `column_Model`,`column_Table`,`ORDINAL POSITION`
+  ;
+END$$
 
 
 DELIMITER ;
