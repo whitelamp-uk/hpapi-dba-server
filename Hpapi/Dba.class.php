@@ -6,9 +6,7 @@ class Dba extends \Hpapi\Db {
 
 /*
 Base properties: 
-    private $cfg;
     private $dfn;
-    private $DSN;
     private $filter;
     public  $hpapi;
     public  $inputs;
@@ -19,8 +17,8 @@ Base properties:
 */
     public $userUUID;
 
-    public function __construct (\Hpapi\Hpapi $hpapi) {
-        parent::__construct ($hpapi);
+    public function __construct (\Hpapi\Hpapi $hpapi,$model) {
+        parent::__construct ($hpapi,$model);
         $this->userUUID = $this->hpapi->userUUID;
     }
 
