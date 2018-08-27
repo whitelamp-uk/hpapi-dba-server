@@ -450,12 +450,12 @@ Base properties:
 
     // DESCRIBE DATA STRUCTURE
 
-    public function describeTable ($dbName,$tableName) {
+    public function describeTable ($modelName,$tableName) {
+        $dbName                 = $this->hpapi->pdoDbName ($this->hpapi->models->{$modelName}->dsn);
         try {
             $columns            = $this->hpapi->dbCall (
-                'hpapiDbaColumnsForTable'
-               ,$model
-               ,$tableName
+                'hpapiDbaColumnsTable'
+               ,$dbName
                ,$tableName
             );
             $columns            = $this->hpapi->parse2D ($columns);
@@ -464,40 +464,63 @@ Base properties:
             throw new \Exception ($e->getMessage());
             return false;
         }
-        $table                  = new \stdClass ();
-        $table->model           = $columns[0]->model;
-        $table->table           = $columns[0]->table;
-        $table->title           = $columns[0]->title;
-        $table->description     = $columns[0]->description;
-        $table->columns         = array ();
+        if (!count($columns)) {
+            throw new \Exception (HPAPI_STR_DBA_TABLE_COLS);
+            return false;
+        }
+        $table                      = new \stdClass ();
+        $table->model               = $columns[0]->model;
+        $table->table               = $columns[0]->table;
+        $table->title               = $columns[0]->title;
+        $table->description         = $columns[0]->description;
+        $table->columns             = array ();
         foreach ($columns as $c) {
             unset ($c->title);
             unset ($c->description);
             array_push ($table->columns,$c);
         }
         return $table;
-    }
+        $table->relationsStrong     = $this->describeRelations ($dbName,$tableName,false);
+        $table->relationsWeak       = $this->describeRelations ($dbName,$tableName,'weak');
+        return $table;
+   }
 
-    public function describeStrongRelations ($dbName,$tableName) {
+    public function describeRelations ($dbName,$tableName,$weak=false) {
         try {
-            $relations          = $this->hpapi->dbCall (
-                'hpapiDbaStrongRelationsForTable'
-               ,$tableName
-            );
-            $relations          = $this->hpapi->parse2D ($relations);
+            if ($weak) {
+                $columns            = $this->hpapi->dbCall (
+                    'hpapiDbaColumnsWeak'
+                   ,$dbName
+                   ,$tableName
+                );
+            }
+            else {
+                $columns            = $this->hpapi->dbCall (
+                    'hpapiDbaColumnsStrong'
+                   ,$dbName
+                   ,$tableName
+            }
+            $columns                = $this->hpapi->parse2D ($columns);
         }
         catch (\Exception $e) {
             throw new \Exception ($e->getMessage());
             return false;
         }
-        $strongs                = array ();
-        foreach ($relations as $r) {
-            if (!array_key_exists($r['constraint'],$strongs)) {
-                $strongs[$r['constraint']] = array ();
+        $relations = new \stdClass ();
+        foreach ($columns as $c) {
+            if (!property_exists($relations,$c->table)) {
+                $relations->{$c->table}                 = new \stdClass ();
+                $relations->{$c->table}->model          = $c->model;
+                $relations->{$c->table}->table          = $c->table;
+                $relations->{$c->table}->title          = $c->title;
+                $relations->{$c->table}->description    = $c->description;
+                $relations->{$c->table}->columns        = array ();
             }
-            array_push ($strongs[$r['constraint']],$r);
+            unset ($c->title);
+            unset ($c->description);
+            array_push ($relations->{$c->table}->columns,$c);
         }
-        return $strongs;
+        return $relations;
     }
 
 }

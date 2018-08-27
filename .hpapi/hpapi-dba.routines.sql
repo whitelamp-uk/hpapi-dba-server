@@ -518,8 +518,8 @@ END$$
 
 -- DATA STRUCTURE
 
-DROP PROCEDURE IF EXISTS `hpapiDbaColumnsForTable`$$
-CREATE PROCEDURE `hpapiDbaColumnsForTable`(
+DROP PROCEDURE IF EXISTS `hpapiDbaColumnsTable`$$
+CREATE PROCEDURE `hpapiDbaColumnsTable`(
   IN        `dbModel` VARCHAR(64) CHARSET ascii
  ,IN        `dbName` VARCHAR(64) CHARSET ascii
  ,IN        `tableName` VARCHAR(64) CHARSET ascii
@@ -574,20 +574,38 @@ BEGIN
 END$$
 
 
-DROP PROCEDURE IF EXISTS `hpapiDbaStrongRelationsForTable`$$
-CREATE PROCEDURE `hpapiDbaStrongRelationsForTable`(
-  IN        `dbModel` VARCHAR(64) CHARSET ascii
+DROP PROCEDURE IF EXISTS `hpapiDbaColumnsStrong`$$
+CREATE PROCEDURE `hpapiDbaColumnsStrong`(
+  IN        `modelName` VARCHAR(64) CHARSET ascii
  ,IN        `dbName` VARCHAR(64) CHARSET ascii
  ,IN        `tableName` VARCHAR(64) CHARSET ascii
 )
 BEGIN
   SELECT
-    `CONSTRAINT_NAME` AS `constraint`
-   ,`COLUMN_NAME` AS `pointer`
-   ,`REFERENCED_TABLE_SCHEMA` AS `database`
-   ,`REFERENCED_TABLE_NAME` AS `table`
-   ,`REFERENCED_COLUMN_NAME` AS `describesRow`
-  FROM `INFORMATION_SCHEMA`.`KEY_COLUMN_USAGE`
+    modelName AS `model`
+   ,`fgn`.`REFERENCED_TABLE_SCHEMA` AS `database`
+   ,`fgn`.`REFERENCED_TABLE_NAME` AS `table`
+   ,`table_Title` AS `title`
+   ,`fgn`.`REFERENCED_COLUMN_NAME` AS `column`
+   ,`column_Heading` AS `heading`
+   ,`column_Column`=`pri`.`COLUMN_NAME` AS `isPrimary`
+   ,`column_Describes_Row`!='0' AS `describesRow`
+  FROM `INFORMATION_SCHEMA`.`KEY_COLUMN_USAGE` AS `fgn`
+  INNER JOIN `hpapi_dba_table`
+          ON `table_Model`=modelName
+         AND `table_Table`=`REFERENCED_TABLE_NAME`
+  LEFT  JOIN `INFORMATION_SCHEMA`.`KEY_COLUMN_USAGE` AS `pri`
+          ON `pri`.`TABLE_CATALOG`=`fgn`.`TABLE_CATALOG`
+         AND `pri`.`TABLE_SCHEMA`=`fgn`.`REFERENCED_TABLE_SCHEMA`
+         AND `pri`.`TABLE_NAME`=`fgn`.`REFERENCED_TABLE_NAME`
+  INNER JOIN `hpapi_dba_column` AS `col`
+          ON `column_Model`=modelName
+         AND `column_Table`=`REFERENCED_TABLE_NAME`
+         AND `column_Column`=`REFERENCED_COLUMN_NAME`
+         AND (
+             `column_Column`=`pri`.`COLUMN_NAME`
+          OR `column_Describes_Row`!='0'
+         )
   WHERE `CONSTRAINT_NAME`='PRIMARY'
     AND `TABLE_CATALOG`='def'
     AND `TABLE_SCHEMA`=dbName
@@ -599,6 +617,18 @@ BEGIN
     )
   GROUP BY `column_Model`,`column_Table`,`column_Column`
   ORDER BY `column_Model`,`column_Table`,`ORDINAL POSITION`
+  ;
+END$$
+
+
+DROP PROCEDURE IF EXISTS `hpapiDbaColumnsWeak`$$
+CREATE PROCEDURE `hpapiDbaColumnsWeak`(
+  IN        `modelName` VARCHAR(64) CHARSET ascii
+ ,IN        `dbName` VARCHAR(64) CHARSET ascii
+ ,IN        `tableName` VARCHAR(64) CHARSET ascii
+)
+BEGIN
+  SELECT
   ;
 END$$
 
