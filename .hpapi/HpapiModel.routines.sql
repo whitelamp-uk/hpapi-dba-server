@@ -33,12 +33,12 @@ BEGIN
       )
       OR (
            grantType!='call'
-           `grant_Level`='0'
+       AND `grant_Level`='0'
        AND `grant_Usergroup`=`granter`.`membership_Usergroup`
       )
       OR (
            grantType!='call'
-           `grant_Level`!='0'
+       AND `grant_Level`!='0'
        AND `grant_Level`<=`grantee`.`usergroup_Level`
       )
     )
@@ -629,6 +629,8 @@ CREATE PROCEDURE `hpapiDbaColumnsWeak`(
 )
 BEGIN
   SELECT
+    `column_Column`
+  FROM `hpapi_dba_column`
   ;
 END$$
 
