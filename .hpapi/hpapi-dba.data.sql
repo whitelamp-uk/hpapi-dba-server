@@ -11,6 +11,6 @@ INSERT IGNORE INTO `hpapi_dba_grant` (`grant_Usergroup`, `grant_Type`, `grant_Le
 ('admin',	'membership',	2),
 ('staff',	'membership',	100000);
 
-INSERT IGNORE INTO `hpapi_dba_node` (`node_Node`, `node_Name`) VALUES
-('default',	'Default Node');
+INSERT IGNORE INTO `hpapi_dba_node` (`node_Model`, `node_Node`) VALUES
+('HpapiModel',	'default');
 
