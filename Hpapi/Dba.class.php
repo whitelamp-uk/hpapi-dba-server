@@ -2,29 +2,45 @@
 
 namespace Hpapi;
 
-class Dba extends \Hpapi\Db {
+class Dba {
 
-/*
-Base properties: 
-    private $dfn;
-    private $filter;
-    public  $hpapi;
-    public  $inputs;
-    public  $model;
-    private $node;
-    private $PDO;
-    private $sprCmd; // eg. CALL (), SELECT () OR EXEC () keyword
-*/
-    public $userUUID;
+    public $userId;
+    public $modelDb;
 
-    public function __construct (\Hpapi\Hpapi $hpapi,$model) {
-        parent::__construct ($hpapi,$model);
-        $this->userUUID = $this->hpapi->userUUID;
+    public function __construct (\Hpapi\Hpapi $hpapi) {
+        $this->hpapi                        = $hpapi;
+        $this->userId                       = $this->hpapi->userId;
     }
 
     public function __destruct ( ) {
-        parent::__destruct ();
     }
+
+
+
+    // MODEL DATABASE
+
+    public function model ($model) {
+        try {
+            $this->db                       = new \Hpapi\Db ($this->hpapi,$this->hpapi->models->$model);
+        }
+        catch (\Exception $e) {
+            $this->hpapi->diagnostic ($e->getMessage());
+            return false;
+        }
+    }
+
+
+
+    // TABLE ADMIN
+
+    public function writeTuple ($model,$table,$column,$primaries,$value) {
+        if (!$this->model($model)) {
+            return false;
+        }
+        
+    }
+
+
 
     // GRANT PERMISSIONS
 
@@ -392,62 +408,6 @@ Base properties:
         return $updates;
     }
 
-    // ADMINISTRATE PERMISSION TO TRASH
-
-    public function grantTrashToUsergroup ($model,$table,$usergroup) {
-        if (!$this->grantAllowed('trash',$usergroup)) {
-            throw new \Exception (HPAPI_STR_DBA_GRANT_ALLOW);
-            return false;
-        }
-        try {
-            $this->hpapi->dbCall (
-                'hpapiDbaTrashInsert'
-               ,$model
-               ,$table
-               ,$usergroup
-            );
-        }
-        catch (\Exception $e) {
-            throw new \Exception ($e->getMessage());
-            return false;
-        }
-        return true;
-    }
-
-    public function revokeTrashFromUsergroup ($model,$table,$usergroup) {
-        if (!$this->grantAllowed('trash',$usergroup)) {
-            throw new \Exception (HPAPI_STR_DBA_GRANT_ALLOW);
-            return false;
-        }
-        try {
-            $this->hpapi->dbCall (
-                'hpapiDbaTrashDelete'
-               ,$model
-               ,$table
-               ,$usergroup
-            );
-        }
-        catch (\Exception $e) {
-            throw new \Exception ($e->getMessage());
-            return false;
-        }
-        return true;
-    }
-
-    public function showTrashesForUsergroup ($usergroup='*') {
-        try {
-            $trashes    = $this->hpapi->dbCall (
-                'hpapiDbaTrashesForUsergroup'
-               ,$usergroup
-            );
-        }
-        catch (\Exception $e) {
-            throw new \Exception ($e->getMessage());
-            return false;
-        }
-        return $trashes;
-    }
-
     // DESCRIBE DATA STRUCTURE
 
     public function describeTable ($modelName,$tableName) {
@@ -525,4 +485,3 @@ Base properties:
 
 }
 
-?>

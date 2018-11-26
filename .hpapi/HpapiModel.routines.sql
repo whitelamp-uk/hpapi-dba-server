@@ -7,41 +7,62 @@ SET time_zone = '+00:00';
 DELIMITER $$
 
 
--- ALLOW GRANTING
+-- GENERATE PROVISIONAL MODEL SQL
 
-DROP PROCEDURE IF EXISTS `hpapiDbaGrantAllowed`$$
-CREATE PROCEDURE `hpapiDbaGrantAllowed`(
-  IN        `userUUID` CHAR(52) CHARSET ascii
- ,IN        `grantType` VARCHAR(64) CHARSET ascii
- ,IN        `membershipUsergroup` VARCHAR(64) CHARSET ascii
+DROP PROCEDURE IF EXISTS `hpapiDbaModelSql`$$
+CREATE PROCEDURE `hpapiDbaModelSql`(
+  IN        `model` VARCHAR(64) CHARSET ascii
+ ,IN        `dbName` VARCHAR(64) CHARSET ascii
 )
 BEGIN
   SELECT
-    COUNT(`grant_Level`)>0 AS `allowed`
-  FROM `hpapi_dba_grant`
-  INNER JOIN `hpapi_membership`
-          ON `membership_Usergroup`=`grant_Usergroup`
-  INNER JOIN `hpapi_usergroup` AS `granter`
-          ON `granter`.`usergroup_Usergroup`=`membership_Usergroup`
-  INNER JOIN `hpapi_usergroup` AS `grantee`
-          ON `grantee`.`usergroup_Usergroup`=`membership_Usergroup`
-  WHERE `membership_User_UUID`=userUUID
-    AND `grant_Type`=grantType
-    AND (
-      (
-           grantType='call'
-      )
-      OR (
-           grantType!='call'
-       AND `grant_Level`='0'
-       AND `grant_Usergroup`=`granter`.`membership_Usergroup`
-      )
-      OR (
-           grantType!='call'
-       AND `grant_Level`!='0'
-       AND `grant_Level`<=`grantee`.`usergroup_Level`
-      )
-    )
+    CONCAT(
+      'INSERT '
+     ,'IGNORE INTO `hpapi_model` SET `model`="'
+     ,model
+     ,'",`notes`="'
+     ,model
+     ,'";'
+    ) AS `sql`
+  ;
+  SELECT
+    CONCAT(
+      'INSERT '
+     ,'IGNORE INTO `hpapi_dba_table` SET `model`="'
+     ,model
+     ,'",`table`="'
+     ,`TABLE_NAME`
+     ,'",`title`="'
+     ,`TABLE_NAME`
+     ,'",`description`="'
+     ,`TABLE_NAME`
+     ,'";'
+    ) AS `sql`
+  FROM `information_schema`.`COLUMNS`
+  WHERE `TABLE_SCHEMA`=dbName
+  GROUP BY `TABLE_NAME`
+  ORDER BY `TABLE_NAME`,`ORDINAL_POSITION`
+  ;
+  SELECT
+    CONCAT(
+      'INSERT '
+     ,'IGNORE INTO `hpapi_dba_column` SET `model`="'
+     ,model
+     ,'",`table`="'
+     ,`TABLE_NAME`
+     ,'",`column`="'
+     ,`COLUMN_NAME`
+     ,'",`heading`="'
+     ,`COLUMN_NAME`
+     ,'",`hint`="'
+     ,`COLUMN_NAME`
+     ,'",`pattern`="'
+     ,`COLUMN_TYPE`
+     ,'";'
+    ) AS `sql`
+  FROM `information_schema`.`COLUMNS`
+  WHERE `TABLE_SCHEMA`=dbName
+  ORDER BY `TABLE_NAME`,`ORDINAL_POSITION`
   ;
 END$$
 
@@ -51,48 +72,47 @@ END$$
 
 DROP PROCEDURE IF EXISTS `hpapiDbaMembershipInsert`$$
 CREATE PROCEDURE `hpapiDbaMembershipInsert`(
-  IN        `userUUID` CHAR(52) CHARSET ascii
+  IN        `userId` INT(11) UNSIGNED
  ,IN        `usergroup` varchar(64) CHARSET ascii
 )
 BEGIN
   INSERT IGNORE INTO `hpapi_membership`
   SET
-    `membership_UserUUID`=userUUID
-   ,`membership_Usergroup`=usergroup
+    `user_id`=userId
+   ,`usergroup`=usergroup
   ;
 END$$
 
 DROP PROCEDURE IF EXISTS `hpapiDbaMembershipDelete`$$
 CREATE PROCEDURE `hpapiDbaMembershipDelete`(
-  IN        `userUUID` CHAR(52) CHARSET ascii
+  IN        `userId` INT(11) UNSIGNED
  ,IN        `usergroup` varchar(64) CHARSET ascii
 )
 BEGIN
   DELETE FROM `hpapi_membership`
-  WHERE `membership_UserUUID`=userUUID
-    AND `membership_Usergroup`=usergroup
-    AND CHAR_LENGTH(`membership_UserUUID`)>0
+  WHERE `userId`=userUUID
+    AND `usergroup`=usergroup
+    AND `userId`>0
   ;
 END$$
 
 DROP PROCEDURE IF EXISTS `hpapiDbaMembershipsForUser`$$
 CREATE PROCEDURE `hpapiDbaMembershipsForUser`(
-  IN        `userUUID` CHAR(52) CHARSET ascii
+  IN        `userId` INT(11) UNSIGNED
 )
 BEGIN
   SELECT
-    `usergroup_Name` AS `usergroupName`
-   ,`usergroup_Notes` AS `usergroupNotes`
-   ,`usergroup_Level` AS `usergroupLevel`
-   ,`level_Name` AS `levelName`
-   ,`level_Notes` AS `levelNotes`
+    `hpapi_usergroup`.`usergroup` AS `usergroup`
+    `hpapi_usergroup`.`name` AS `usergroupName`
+   ,`hpapi_usergroup`.`unotes` AS `usergroupNotes`
+   ,`hpapi_usergroup`.`level` AS `usergroupLevel`
+   ,`hpapi_level`.`name` AS `levelName`
+   ,`hpapi_level`.`notes` AS `levelNotes`
   FROM `hpapi_membership`
-  LEFT JOIN `hpapi_usergroup`
-         ON `usergroup_Usergroup`=`membership_Usergroup`
-  LEFT JOIN `hpapi_level`
-         ON `level_Level`=`usergroup_Level`
-  WHERE `membership_UserUUID`=userUUID
-  ORDER BY `level_Level`
+  LEFT JOIN `hpapi_usergroup` USING (`usergroup`)
+  LEFT JOIN `hpapi_level` USING (`level`)
+  WHERE `hpapi_membership`.`userId`=userId
+  ORDER BY `hpapi_usergroup`.`level`
   ;
 END$$
 
@@ -102,25 +122,19 @@ CREATE PROCEDURE `hpapiDbaMembershipsForUsergroup`(
 )
 BEGIN
   SELECT
-    IF(`user_Active`>0,'ACTIVE','') AS `active`
-   ,`user_UUID` AS `userUUID`
-   ,GROUP_CONCAT(`key_Key` SEPARATOR ',') AS `keys`
-   ,GROUP_CONCAT(`email_Email` SEPARATOR ',') AS `emails`
-   ,`user_Name`
-   ,`user_Notes`
+   ,`hpapi_user`.`id`
+    `hpapi_user`.`active`
+   ,`hpapi_user`.`key`
+   ,`hpapi_user`.`name`
+   ,`hpapi_user`.`notes`
+   ,`hpapi_user`.`email`
   FROM `hpapi_membership`
   LEFT JOIN `hpapi_user`
-         ON `user_UUID`=`membership_User_UUID`
-  WHERE (
-        `membership_Usergroup`=usergroup
-     OR usergroup='*'
-        )
-  GROUP BY `user_UUID`
+         ON `hpapi_user`.`id`=`hpapi_membership`.`user_id`
+  WHERE `hpapi_membership`.`usergroup`=usergroup
   ORDER BY
-        `usergroup_Level`
-       ,`usergroup_Name`
-       ,`user_Active` DESC
-       ,`user_UUID`
+        `hpapi_user`.`active` DESC
+       ,`hpapi_user`.`name`
   ;
 END$$
 
@@ -141,11 +155,11 @@ CREATE PROCEDURE `hpapiDbaRunInsert`(
 BEGIN
   INSERT IGNORE INTO `hpapi_run`
   SET
-    `run_Usergroup`=usergroup
-   ,`run_Vendor`=vendor
-   ,`run_Package`=package
-   ,`run_Class`=class
-   ,`run_Method`=method
+    `usergroup`=usergroup
+   ,`vendor`=vendor
+   ,`package`=package
+   ,`class`=class
+   ,`method`=method
   ;
 END$$
 
@@ -159,11 +173,11 @@ CREATE PROCEDURE `hpapiDbaRunDelete`(
 )
 BEGIN
   DELETE FROM `hpapi_run`
-  WHERE `run_Usergroup`=usergroup
-    AND `run_Vendor`=vendor
-    AND `run_Package`=package
-    AND `run_Class`=class
-    AND `run_Method`=method
+  WHERE `usergroup`=usergroup
+    AND `vendor`=vendor
+    AND `package`=package
+    AND `class`=class
+    AND `method`=method
   ;
 END$$
 
@@ -173,23 +187,19 @@ CREATE PROCEDURE `hpapiDbaRunsForUsergroup`(
 )
 BEGIN
   SELECT
-    `run_Vendor` AS `vendor`
-   ,`run_Package` AS `package`
-   ,`run_Class` AS `class`
-   ,`run_Method` AS `method`
-   ,`run_Usergroup` AS `usergroup`
+    `vendor`
+   ,`package`
+   ,`class`
+   ,`method`
+   ,`usergroup`
   FROM `hpapi_run`
-  WHERE (
-        `run_Usergroup`=usergroup
-     OR usergroup='*'
-  
-  )
+  WHERE `usergroup`=usergroup
   ORDER BY
-    `run_Usergroup`
-   ,`run_Vendor`
-   ,`run_Package`
-   ,`run_Class`
-   ,`run_Method`
+    `usergroup`
+   ,`vendor`
+   ,`package`
+   ,`class`
+   ,`method`
   ;
 END$$
 
@@ -202,34 +212,22 @@ CREATE PROCEDURE `hpapiDbaRunsForMethod`(
 )
 BEGIN
   SELECT
-    `run_Vendor` AS `vendor`
-   ,`run_Package` AS `package`
-   ,`run_Class` AS `class`
-   ,`run_Method` AS `method`
-   ,`run_Usergroup` AS `usergroup`
+    `vendor`
+   ,`package`
+   ,`class`
+   ,`method`
+   ,`usergroup`
   FROM `hpapi_run`
-  WHERE (
-        `run_Vendor`=vendor
-     OR vendor='*'
-  )
-    AND (
-        `run_Package`=package
-     OR package='*'
-    )
-    AND (
-        `run_Class`=class
-     OR class='*'
-    )
-    AND (
-        `run_Method`=method
-     OR method='*'
-    )
+  WHERE `vendor`=vendor
+    AND`package`=package
+    AND `class`=class
+    AND `method`=method
   ORDER BY
-    `run_Vendor`
-   ,`run_Package`
-   ,`run_Class`
-   ,`run_Method`
-   ,`run_Usergroup`
+    `vendor`
+   ,`package`
+   ,`class`
+   ,`method`
+   ,`usergroup`
   ;
 END$$
 
@@ -251,12 +249,12 @@ CREATE PROCEDURE `hpapiDbaCallInsert`(
 BEGIN
   INSERT IGNORE INTO `hpapi_call`
   SET
-    `call_Model`=model
-   ,`call_Spr`=spr
-   ,`call_Vendor`=vendor
-   ,`call_Package`=package
-   ,`call_Class`=class
-   ,`call_Method`=method
+    `model`=model
+   ,`spr`=spr
+   ,`vendor`=vendor
+   ,`package`=package
+   ,`class`=class
+   ,`method`=method
   ;
 END$$
 
@@ -271,12 +269,12 @@ CREATE PROCEDURE `hpapiDbaCallDelete`(
 )
 BEGIN
   DELETE FROM `hpapi_call`
-  WHERE `call_Model`=model
-    AND `call_Spr`=spr
-    AND `call_Vendor`=vendor
-    AND `call_Package`=package
-    AND `call_Class`=class
-    AND `call_Method`=method
+  WHERE `model`=model
+    AND `spr`=spr
+    AND `vendor`=vendor
+    AND `package`=package
+    AND `class`=class
+    AND `method`=method
   ;
 END$$
 
@@ -287,25 +285,22 @@ CREATE PROCEDURE `hpapiDbaCallsForSpr`(
 )
 BEGIN
   SELECT
-    `call_Vendor` AS `vendor`
-   ,`call_Package` AS `package`
-   ,`call_Class` AS `class`
-   ,`call_Method` AS `method`
-   ,`call_Model` AS `model`
-   ,`call_Spr` AS `spr`
+    `vendor`
+   ,`package`
+   ,`class`
+   ,`method`
+   ,`model`
+   ,`spr`
   FROM `hpapi_call`
-  WHERE `call_Model`=model
-    AND (
-        `call_Spr`=spr
-     OR spr='*'
-  )
+  WHERE `model`=model
+    AND `spr`=spr
   ORDER BY
-    `call_Model`
-   ,`call_Spr`
-   ,`call_Vendor`
-   ,`call_Package`
-   ,`call_Class`
-   ,`call_Method`
+    `model`
+   ,`spr`
+   ,`vendor`
+   ,`package`
+   ,`class`
+   ,`method`
   ;
 END$$
 
@@ -318,36 +313,24 @@ CREATE PROCEDURE `hpapiDbaCallsForMethod`(
 )
 BEGIN
   SELECT
-    `call_Vendor` AS `vendor`
-   ,`call_Package` AS `package`
-   ,`call_Class` AS `class`
-   ,`call_Method` AS `method`
-   ,`call_Model` AS `model`
-   ,`call_Spr` AS `spr`
+    `vendor`
+   ,`package`
+   ,`class`
+   ,`method`
+   ,`model`
+   ,`spr`
   FROM `hpapi_call`
-  WHERE (
-        `call_Vendor`=vendor
-     OR vendor='*'
-  )
-    AND (
-        `call_Package`=package
-     OR package='*'
-    )
-    AND (
-        `call_Class`=class
-     OR class='*'
-    )
-    AND (
-        `call_Method`=method
-     OR method='*'
-    )
+  WHERE `call`=vendor
+    AND `package`=package
+    AND `class`=class
+    AND `method`=method
   ORDER BY
-    `call_Vendor`
-   ,`call_Package`
-   ,`call_Class`
-   ,`call_Method`
-   ,`call_Model`
-   ,`call_Spr`
+    `vendor`
+   ,`package`
+   ,`class`
+   ,`method`
+   ,`model`
+   ,`spr`
   ;
 END$$
 
@@ -359,30 +342,30 @@ END$$
 
 DROP PROCEDURE IF EXISTS `hpapiDbaInsertInsert`$$
 CREATE PROCEDURE `hpapiDbaInsertInsert`(
-  IN        `insertModel` varchar(64) CHARSET ascii
- ,IN        `insertTable` varchar(64) CHARSET ascii
- ,IN        `insertUsergroup` varchar(64) CHARSET ascii
+  IN        `model` varchar(64) CHARSET ascii
+ ,IN        `table` varchar(64) CHARSET ascii
+ ,IN        `usergroup` varchar(64) CHARSET ascii
 )
 BEGIN
-  INSERT IGNORE INTO `hpapi_insert`
+  INSERT IGNORE INTO `hpapi_dba_insert`
   SET
-    `insert_Model`=insertModel
-   ,`insert_Table`=insertTable
-   ,`insert_Usergroup`=insertUsergroup
+    `model`=model
+   ,`table`=table
+   ,`usergroup`=usergroup
   ;
 END$$
 
 DROP PROCEDURE IF EXISTS `hpapiDbaInsertDelete`$$
 CREATE PROCEDURE `hpapiDbaInsertDelete`(
-  IN        `insertModel` varchar(64) CHARSET ascii
- ,IN        `insertTable` varchar(64) CHARSET ascii
- ,IN        `insertUsergroup` varchar(64) CHARSET ascii
+  IN        `model` varchar(64) CHARSET ascii
+ ,IN        `table` varchar(64) CHARSET ascii
+ ,IN        `usergroup` varchar(64) CHARSET ascii
 )
 BEGIN
-  DELETE FROM `hpapi_insert`
-  WHERE `insert_Model`=insertModel
-    AND `insert_Table`=insertTable
-    AND `insert_Usergroup`=insertUsergroup
+  DELETE FROM `hpapi_dba_insert`
+  WHERE `model`=model
+    AND `table`=table
+    AND `usergroup`=usergroup
   ;
 END$$
 
@@ -392,53 +375,104 @@ CREATE PROCEDURE `hpapiDbaInsertsForUsergroup`(
 )
 BEGIN
   SELECT
-    `insert_Model` AS `model`
-   ,`insert_Table` AS `table`
-  FROM `hpapi_insert`
-  WHERE ( 
-        `insert_Usergroup`=usergroup
-     OR usergroup='*'
-  )
+    `model`
+   ,`table`
+  FROM `hpapi_dba_insert`
+  WHERE `usergroup`=usergroup
   ORDER BY
-    `insert_Model`
-   ,`insert_Table`
+    `model`
+   ,`table`
   ;
 END$$
 
+
+
+-- ADMINISTRATE SELECT PERMISSION
+
+DROP PROCEDURE IF EXISTS `hpapiDbaSelectInsert`$$
+CREATE PROCEDURE `hpapiDbaSelectInsert`(
+  IN        `model` varchar(64) CHARSET ascii
+ ,IN        `table` varchar(64) CHARSET ascii
+ ,IN        `column` varchar(64) CHARSET ascii
+ ,IN        `usergroup` varchar(64) CHARSET ascii
+)
+BEGIN
+  INSERT IGNORE INTO `hpapi_dba_select`
+  SET
+    `model`=model
+   ,`table`=table
+   ,`column`=column
+   ,`usergroup`=usergroup
+  ;
+END$$
+
+DROP PROCEDURE IF EXISTS `hpapiDbaSelectDelete`$$
+CREATE PROCEDURE `hpapiDbaSelectDelete`(
+  IN        `model` varchar(64) CHARSET ascii
+ ,IN        `table` varchar(64) CHARSET ascii
+ ,IN        `column` varchar(64) CHARSET ascii
+ ,IN        `usergroup` varchar(64) CHARSET ascii
+)
+BEGIN
+  DELETE FROM `hpapi_dba_select`
+  WHERE `model`=model
+    AND `table`=table
+    AND `column`=column
+    AND `usergroup`=usergroup
+  ;
+END$$
+
+DROP PROCEDURE IF EXISTS `hpapiDbaSelectsForUsergroup`$$
+CREATE PROCEDURE `hpapiDbaSelectsForUsergroup`(
+  IN        `usergroup` varchar(64) CHARSET ascii
+)
+BEGIN
+  SELECT
+    `model`
+   ,`table`
+   ,`column`
+  FROM `hpapi_dba_select`
+  WHERE `usergroup`=usergroup
+  ORDER BY
+    `model`
+   ,`table`
+   ,`column`
+  ;
+END$$
 
 
 -- ADMINISTRATE UPDATE PERMISSION
 
 DROP PROCEDURE IF EXISTS `hpapiDbaUpdateInsert`$$
 CREATE PROCEDURE `hpapiDbaUpdateInsert`(
-  IN        `updateModel` varchar(64) CHARSET ascii
- ,IN        `updateTable` varchar(64) CHARSET ascii
- ,IN        `updateColumn` varchar(64) CHARSET ascii
- ,IN        `updateUsergroup` varchar(64) CHARSET ascii
+  IN        `model` varchar(64) CHARSET ascii
+ ,IN        `table` varchar(64) CHARSET ascii
+ ,IN        `column` varchar(64) CHARSET ascii
+ ,IN        `usergroup` varchar(64) CHARSET ascii
 )
 BEGIN
-  INSERT IGNORE INTO `hpapi_update`
+  INSERT IGNORE INTO `hpapi_dba_update`
   SET
-    `update_Model`=updateModel
-   ,`update_Table`=updateTable
-   ,`update_Column`=updateColumn
-   ,`update_Usergroup`=updateUsergroup
+    `model`=model
+   ,`table`=table
+   ,`column`=column
+   ,`usergroup`=usergroup
   ;
 END$$
 
 DROP PROCEDURE IF EXISTS `hpapiDbaUpdateDelete`$$
 CREATE PROCEDURE `hpapiDbaUpdateDelete`(
-  IN        `updateModel` varchar(64) CHARSET ascii
- ,IN        `updateTable` varchar(64) CHARSET ascii
- ,IN        `updateColumn` varchar(64) CHARSET ascii
- ,IN        `updateUsergroup` varchar(64) CHARSET ascii
+  IN        `model` varchar(64) CHARSET ascii
+ ,IN        `table` varchar(64) CHARSET ascii
+ ,IN        `column` varchar(64) CHARSET ascii
+ ,IN        `usergroup` varchar(64) CHARSET ascii
 )
 BEGIN
-  DELETE FROM `hpapi_update`
-  WHERE `update_Model`=updateModel
-    AND `update_Table`=updateTable
-    AND `update_Column`=updateColumn
-    AND `update_Usergroup`=updateUsergroup
+  DELETE FROM `hpapi_dba_update`
+  WHERE `model`=model
+    AND `table`=table
+    AND `column`=column
+    AND `usergroup`=usergroup
   ;
 END$$
 
@@ -448,72 +482,18 @@ CREATE PROCEDURE `hpapiDbaUpdatesForUsergroup`(
 )
 BEGIN
   SELECT
-    `update_Model` AS `model`
-   ,`update_Table` AS `table`
-   ,`update_Column` AS `column`
-  FROM `hpapi_update`
-  WHERE ( 
-        `update_Usergroup`=usergroup
-     OR usergroup='*'
-  )
+    `model`
+   ,`table`
+   ,`column`
+  FROM `hpapi_dba_update`
+  WHERE `usergroup`=usergroup
   ORDER BY
-    `update_Model`
-   ,`update_Table`
-   ,`update_Column`
+    `model`
+   ,`table`
+   ,`column`
   ;
 END$$
 
-
-
--- ADMINISTRATE TRASH PERMISSION
-
-DROP PROCEDURE IF EXISTS `hpapiDbaTrashInsert`$$
-CREATE PROCEDURE `hpapiDbaTrashInsert`(
-  IN        `trashModel` varchar(64) CHARSET ascii
- ,IN        `trashTable` varchar(64) CHARSET ascii
- ,IN        `trashUsergroup` varchar(64) CHARSET ascii
-)
-BEGIN
-  INSERT IGNORE INTO `hpapi_trash`
-  SET
-    `trash_Model`=trashModel
-   ,`trash_Table`=trashTable
-   ,`trash_Usergroup`=trashUsergroup
-  ;
-END$$
-
-DROP PROCEDURE IF EXISTS `hpapiDbaTrashDelete`$$
-CREATE PROCEDURE `hpapiDbaTrashDelete`(
-  IN        `trashModel` varchar(64) CHARSET ascii
- ,IN        `trashTable` varchar(64) CHARSET ascii
- ,IN        `trashUsergroup` varchar(64) CHARSET ascii
-)
-BEGIN
-  DELETE FROM `hpapi_trash`
-  WHERE `trash_Model`=insertModel
-    AND `trash_Table`=insertTable
-    AND `trash_Usergroup`=insertUsergroup
-  ;
-END$$
-
-DROP PROCEDURE IF EXISTS `hpapiDbaTrashesForUsergroup`$$
-CREATE PROCEDURE `hpapiDbaTrashesForUsergroup`(
-  IN        `usergroup` varchar(64) CHARSET ascii
-)
-BEGIN
-  SELECT
-    `trash_Model` AS `model`
-   ,`trash_Table` AS `table`
-  FROM `hpapi_trash`
-  WHERE ( 
-        `trash_Usergroup`=usergroup
-     OR usergroup='*'
-  )
-  ORDER BY
-    `insert_Model`
-   ,`insert_Table`
-  ;
-END$$
 
 
 -- DATA STRUCTURE
@@ -526,111 +506,97 @@ CREATE PROCEDURE `hpapiDbaColumnsTable`(
 )
 BEGIN
   SELECT
-    `table_Model` AS `model`
-   ,`table_Table` AS `table`
-   ,`table_Title` AS `title`
-   ,`table_Description` AS `description`
-   ,`column_Column` AS `column`
-   ,`CONSTRAINT_NAME` IS NOT NULL AS `isPrimary`
-   ,`column_Heading` AS `heading`
-   ,`column_Hint` AS `hint`
-   ,`column_Describes_Row` AS `describesRow`
-   ,`column_Means_Is_Trashed` AS `meansIsTrashed`
-   ,`column_Means_Edited_Datetime` AS `meansEditedDatetime`
-   ,`column_Means_Editor_UUID` AS `meansEditorUUID`
-   ,`IS_NULLABLE` AS `emptyIsNull`
-   ,`CHARACTER_MAXIMUM_LENGTH` AS `characterMaximumLength`
-   ,`pattern_Pattern` AS `pattern`
-   ,`pattern_Constraints` AS `constraints`
-   ,`pattern_Expression` AS `expression`
+    `hpapi_dba_table`.`model`
+   ,`hpapi_dba_table``table`
+   ,`hpapi_dba_table`.`title`
+   ,`hpapi_dba_table`.`description`
+   ,`hpapi_dba_column`.`column`
+   ,`INFORMATION_SCHEMA`.`KEY_COLUMN_USAGE`.`CONSTRAINT_NAME` IS NOT NULL AS `isPrimary`
+   ,`hpapi_dba_column`.`heading`
+   ,`hpapi_dba_column`.`hint`
+   ,`hpapi_dba_column`.`describes_row` AS `describesRow`
+   ,`INFORMATION_SCHEMA`.`COLUMNS`.`IS_NULLABLE` AS `emptyIsNull`
+   ,`INFORMATION_SCHEMA`.`COLUMNS`.`CHARACTER_MAXIMUM_LENGTH` AS `characterMaximumLength`
+   ,`hpapi_dba_pattern`.`pattern`
+   ,`hpapi_dba_pattern`.`constraints`
+   ,`hpapi_dba_pattern`.`expression`
    ,`pattern_Input` AS `input`
-   ,`pattern_Php_Filter` AS `phpFilter`
-   ,`pattern_Length_Minimum` AS `lengthMinimum`
-   ,`pattern_Length_Maximum` AS `lengthMaximum`
-   ,`pattern_Value_Minimum` AS `valueMinimum`
-   ,`pattern_Value_Maximum` AS `valueMinimum`
+   ,`hpapi_dba_pattern`.`php_filter` AS `phpFilter`
+   ,`hpapi_dba_pattern`.`length_minimum` AS `lengthMinimum`
+   ,`hpapi_dba_pattern`.`length_maximum` AS `lengthMaximum`
+   ,`hpapi_dba_pattern`.`value_minimum` AS `valueMinimum`
+   ,`hpapi_dba_pattern`.`value_maximum` AS `valueMaximum`
   FROM `hpapi_dba_table`
-  INNER JOIN `hpapi_dba_column`
-          ON `column_Model`=`table_Model`
-         AND `column_Table`=`table_Table`
+  INNER JOIN `hpapi_dba_column` USING (`model`,`table`)
   INNER JOIN `INFORMATION_SCHEMA`.`COLUMNS`
           ON `COLUMNS`.`TABLE_SCHEMA`=dbName
-         AND `COLUMNS`.`TABLE_NAME`=`column_Table`
-         AND `COLUMNS`.`COLUMN_NAME`=`column_Column`
+         AND `COLUMNS`.`TABLE_NAME`=`hpapi_dba_column`.`table`
+         AND `COLUMNS`.`COLUMN_NAME`=`hpapi_dba_column`.`column`
   LEFT  JOIN `INFORMATION_SCHEMA`.`KEY_COLUMN_USAGE`
           ON `KEY_COLUMN_USAGE`.`CONSTRAINT_NAME`='PRIMARY'
          AND `KEY_COLUMN_USAGE`.`TABLE_CATALOG`=`COLUMNS`.`TABLE_CATALOG`
          AND `KEY_COLUMN_USAGE`.`TABLE_SCHEMA`=`COLUMNS`.`TABLE_SCHEMA`
          AND `KEY_COLUMN_USAGE`.`TABLE_NAME`=`COLUMNS`.`TABLE_NAME`
          AND `KEY_COLUMN_USAGE`.`COLUMN_NAME`=`COLUMNS`.`COLUMN_NAME`
-  INNER JOIN `hpapi_dba_pattern`
-          ON `pattern_Pattern`=`column_Pattern`
-  WHERE `COLUMNS`.`TABLE_CATALOG`='def'
-    AND `column_Model`=dbModel
-    AND `column_Table`=tableName
-  GROUP BY `column_Model`,`column_Table`,`column_Column`
-  ORDER BY `column_Model`,`column_Table`,`ORDINAL POSITION`
+  INNER JOIN `hpapi_dba_pattern` USING (`pattern`)
+  WHERE `INFORMATION_SCHEMA`.`COLUMNS`.`TABLE_CATALOG`='def'
+    AND `hpapi_dba_table`.`model`=dbModel
+    AND `hpapi_dba_table`.`table`=tableName
+  GROUP BY
+    `hpapi_dba_table`.`model`
+   ,`hpapi_dba_table`.`table`
+   ,`hpapi_dba_column`.`column`
+  ORDER BY
+    `hpapi_dba_table`.`model`
+   ,`hpapi_dba_table`.`table`
+   ,`INFORMATION_SCHEMA`.`COLUMNS`.`ORDINAL POSITION`
   ;
 END$$
 
 
 DROP PROCEDURE IF EXISTS `hpapiDbaColumnsStrong`$$
 CREATE PROCEDURE `hpapiDbaColumnsStrong`(
-  IN        `modelName` VARCHAR(64) CHARSET ascii
+  IN        `dbModel` VARCHAR(64) CHARSET ascii
  ,IN        `dbName` VARCHAR(64) CHARSET ascii
  ,IN        `tableName` VARCHAR(64) CHARSET ascii
 )
 BEGIN
   SELECT
-    modelName AS `model`
+    dbModel AS `model`
    ,`fgn`.`REFERENCED_TABLE_SCHEMA` AS `database`
    ,`fgn`.`REFERENCED_TABLE_NAME` AS `table`
-   ,`table_Title` AS `title`
+   ,`hpapi_dba_table`.`title`
    ,`fgn`.`REFERENCED_COLUMN_NAME` AS `column`
-   ,`column_Heading` AS `heading`
-   ,`column_Column`=`pri`.`COLUMN_NAME` AS `isPrimary`
-   ,`column_Describes_Row`!='0' AS `describesRow`
+   ,`hpapi_dba_column`.`heading`
+   ,`hpapi_dba_column`.`column`=`pri`.`COLUMN_NAME` AS `isPrimary`
+   ,`hpapi_dba_column`.`describes_row`!='0' AS `describesRow`
   FROM `INFORMATION_SCHEMA`.`KEY_COLUMN_USAGE` AS `fgn`
   INNER JOIN `hpapi_dba_table`
-          ON `table_Model`=modelName
-         AND `table_Table`=`REFERENCED_TABLE_NAME`
+          ON `hpapi_dba_table`.`model`=dbModel
+         AND `hpapi_dba_table`.`table`=`REFERENCED_TABLE_NAME`
   LEFT  JOIN `INFORMATION_SCHEMA`.`KEY_COLUMN_USAGE` AS `pri`
           ON `pri`.`TABLE_CATALOG`=`fgn`.`TABLE_CATALOG`
          AND `pri`.`TABLE_SCHEMA`=`fgn`.`REFERENCED_TABLE_SCHEMA`
          AND `pri`.`TABLE_NAME`=`fgn`.`REFERENCED_TABLE_NAME`
   INNER JOIN `hpapi_dba_column` AS `col`
-          ON `column_Model`=modelName
-         AND `column_Table`=`REFERENCED_TABLE_NAME`
-         AND `column_Column`=`REFERENCED_COLUMN_NAME`
+          ON `col`.`model`=dbModel
+         AND `col`.`table`=`REFERENCED_TABLE_NAME`
+         AND `col`.`column`=`REFERENCED_COLUMN_NAME`
          AND (
-             `column_Column`=`pri`.`COLUMN_NAME`
-          OR `column_Describes_Row`!='0'
+             `col`.`column`=`pri`.`COLUMN_NAME`
+          OR `col`.`describes_row`!='0'
          )
-  WHERE `CONSTRAINT_NAME`='PRIMARY'
-    AND `TABLE_CATALOG`='def'
-    AND `TABLE_SCHEMA`=dbName
-    AND `TABLE_NAME`=tableName
-    AND `COLUMN_NAME`=`COLUMNS`.`COLUMN_NAME`
+  WHERE `fgn`.`CONSTRAINT_NAME`='PRIMARY'
+    AND `fgn`.`TABLE_CATALOG`='def'
+    AND `fgn`.`TABLE_SCHEMA`=dbName
+    AND `fgn`.`TABLE_NAME`=tableName
+    AND `fgn`.`COLUMN_NAME`=`COLUMNS`.`COLUMN_NAME`
     AND (
-        `REFERENCED_TABLE_SCHEMA`!=`TABLE_SCHEMA`
-     OR `REFERENCED_TABLE_NAME`!=`TABLE_NAME`
+        `fgn`.`REFERENCED_TABLE_SCHEMA`!=`fgn`.`TABLE_SCHEMA`
+     OR `fgn`.`REFERENCED_TABLE_NAME`!=`fgn`.`TABLE_NAME`
     )
-  GROUP BY `column_Model`,`column_Table`,`column_Column`
-  ORDER BY `column_Model`,`column_Table`,`ORDINAL POSITION`
-  ;
-END$$
-
-
-DROP PROCEDURE IF EXISTS `hpapiDbaColumnsWeak`$$
-CREATE PROCEDURE `hpapiDbaColumnsWeak`(
-  IN        `modelName` VARCHAR(64) CHARSET ascii
- ,IN        `dbName` VARCHAR(64) CHARSET ascii
- ,IN        `tableName` VARCHAR(64) CHARSET ascii
-)
-BEGIN
-  SELECT
-    `column_Column`
-  FROM `hpapi_dba_column`
+  GROUP BY `hpapi_dba_column`.`model`,`hpapi_dba_column`.`table`,`hpapi_dba_column`.`column`
+  ORDER BY `hpapi_dba_column`.`model`,`hpapi_dba_column`.`table`,`fgn`.`ORDINAL POSITION`
   ;
 END$$
 
