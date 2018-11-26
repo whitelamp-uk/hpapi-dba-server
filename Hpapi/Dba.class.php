@@ -33,12 +33,22 @@ class Dba {
 
     // TABLE ADMIN
 
-    public function writeTuple ($model,$table,$column,$primaries,$value) {
-        if (!$this->model($model)) {
-            return false;
-        }
-        
+    public function rowInsert ($object) {
+
     }
+
+    public function rowUpdate ($object) {
+
+    }
+
+    public function rowsSelect ($object) {
+
+    }
+
+    public function tupleUpdate ($object) {
+
+    }
+
 
 
 
