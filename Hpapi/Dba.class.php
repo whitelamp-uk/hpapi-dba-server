@@ -17,11 +17,63 @@ class Dba {
 
 
 
+    // PRIVILEGES
+
+    private function callPrivileges () {
+        try {
+            $columns                                = $this->db->call (
+                'hpapiDbaPrivileges'
+            );
+        }
+        catch (\Exception $e) {
+            $this->diagnostic ($e->getMessage());
+            $this->object->response->error          = HPAPI_STR_ERROR_DB;
+            return false;
+        }
+        $privileges                                 = array ();
+        foreach ($columns as $c) {
+/*
+            $method                                 = $m['method'];
+            unset ($m['method']);
+            if (!array_key_exists($method,$privileges)) {
+                $privileges[$method]                = array ();
+                $privileges[$method]['usergroups']  = array ();
+                $privileges[$method]['arguments']   = array ();
+                $privileges[$method]['sprs']        = array ();
+                $privileges[$method]['package']     = $m['packageNotes'];
+                $privileges[$method]['notes']       = $m['methodNotes'];
+                $privileges[$method]['label']       = $m['methodLabel'];
+            }
+            if (!$m['usergroup']) {
+                continue;
+            }
+            if (!in_array($m['usergroup'],$privileges[$method]['usergroups'])) {
+                array_push ($privileges[$method]['usergroups'],$m['usergroup']);
+            }
+            if (!$m['argument']) {
+                continue;
+            }
+            if (array_key_exists($m['argument'],$privileges[$method]['arguments'])) {
+                continue;
+            }
+            unset ($m['usergroup']);
+            unset ($m['packageNotes']);
+            unset ($m['methodNotes']);
+            unset ($m['packageNotes']);
+            $privileges[$method]['arguments'][$m['argument']] = $m;
+*/
+        }
+        return $privileges;
+    }
+
+
+
+
     // MODEL DATABASE
 
     public function model ($model) {
         try {
-            $this->db                       = new \Hpapi\Db ($this->hpapi,$this->hpapi->models->$model);
+            return new \Hpapi\DbaDb ($this->hpapi,$this->hpapi->models->$model);
         }
         catch (\Exception $e) {
             $this->hpapi->diagnostic ($e->getMessage());
@@ -35,18 +87,56 @@ class Dba {
 
     public function rowInsert ($object) {
 
+
+$object = '{
+    "model" : "BurdenAndBurden"
+   ,"table" : "bab_fundraiser"
+   ,"row" : {
+        "deleted" : 0
+       ,"badge_number" : 34568
+       ,"teamleader_id" : 1
+       ,"unavailable_currently" : 0
+       ,"known_as" : "Johnny"
+       ,"name_family" : "Rank"
+       ,"name_given" : "John"
+       ,"employmenttype_code" : "S"
+       ,"bond_percentage" : 20
+       ,"weekly_hours" : 35
+       ,"created" : "2018-11-10 17:42:32"
+       ,"updated" : "2018-11-10 18:38:20"        
+    }
+}';
+$object = json_decode ($object,false,HPAPI_JSON_DEPTH);
+
+        if (!($db=$this->model($object->model))) {
+            $this->hpapi->reponse->error    = HPAPI_DBA_STR_DB_OBJ;
+            return false;
+        }
+
+
+
+
     }
 
     public function rowUpdate ($object) {
-
+        if (!($db=$this->model($object->model))) {
+            $this->hpapi->reponse->error    = HPAPI_DBA_STR_DB_OBJ;
+            return false;
+        }
     }
 
     public function rowsSelect ($object) {
-
+        if (!($db=$this->model($object->model))) {
+            $this->hpapi->reponse->error    = HPAPI_DBA_STR_DB_OBJ;
+            return false;
+        }
     }
 
     public function tupleUpdate ($object) {
-
+        if (!($db=$this->model($object->model))) {
+            $this->hpapi->reponse->error    = HPAPI_DBA_STR_DB_OBJ;
+            return false;
+        }
     }
 
 

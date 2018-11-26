@@ -11,25 +11,15 @@ DELIMITER $$
 
 DROP PROCEDURE IF EXISTS `hpapiDbaModelSql`$$
 CREATE PROCEDURE `hpapiDbaModelSql`(
-  IN        `model` VARCHAR(64) CHARSET ascii
+  IN        `dbModel` VARCHAR(64) CHARSET ascii
  ,IN        `dbName` VARCHAR(64) CHARSET ascii
 )
 BEGIN
   SELECT
     CONCAT(
       'INSERT '
-     ,'IGNORE INTO `hpapi_model` SET `model`="'
-     ,model
-     ,'",`notes`="'
-     ,model
-     ,'";'
-    ) AS `sql`
-  ;
-  SELECT
-    CONCAT(
-      'INSERT '
      ,'IGNORE INTO `hpapi_dba_table` SET `model`="'
-     ,model
+     ,dbModel
      ,'",`table`="'
      ,`TABLE_NAME`
      ,'",`title`="'
@@ -47,7 +37,7 @@ BEGIN
     CONCAT(
       'INSERT '
      ,'IGNORE INTO `hpapi_dba_column` SET `model`="'
-     ,model
+     ,dbModel
      ,'",`table`="'
      ,`TABLE_NAME`
      ,'",`column`="'
@@ -62,6 +52,8 @@ BEGIN
     ) AS `sql`
   FROM `information_schema`.`COLUMNS`
   WHERE `TABLE_SCHEMA`=dbName
+    AND `COLUMN_NAME`!='created'
+    AND `COLUMN_NAME`!='updated'
   ORDER BY `TABLE_NAME`,`ORDINAL_POSITION`
   ;
 END$$
@@ -599,6 +591,54 @@ BEGIN
   ORDER BY `hpapi_dba_column`.`model`,`hpapi_dba_column`.`table`,`fgn`.`ORDINAL POSITION`
   ;
 END$$
+
+
+-- PRIVILEGES
+
+DROP PROCEDURE IF EXISTS `hpapiDbaPrivileges`$$
+CREATE PROCEDURE `hpapiDbaPrivileges`(
+)
+BEGIN
+  SELECT
+    CONCAT(
+      `hpapi_dba_table`.`model`
+     ,'::'
+     ,`hpapi_dba_table`.`table`
+     ,'::'
+     ,`hpapi_dba_column`.`column`
+    ) AS `column`
+   ,`hpapi_dba_table`.`title`
+   ,`hpapi_dba_table`.`description`
+   ,`hpapi_dba_column`.`heading`
+   ,`hpapi_dba_column`.`hint`
+   ,GROUP_CONCAT(`hpapi_dba_insert`.`usergroup` SEPARATOR '::') `usergroupsInsert`
+   ,GROUP_CONCAT(`hpapi_dba_select`.`usergroup` SEPARATOR '::') `usergroupsSelect`
+   ,GROUP_CONCAT(`hpapi_dba_update`.`usergroup` SEPARATOR '::') `usergroupsUpdate`
+   ,`hpapi_pattern`.`pattern`
+   ,`hpapi_pattern`.`constraints`
+   ,`hpapi_pattern`.`expression`
+   ,`hpapi_pattern`.`php_filter` AS `phpFilter`
+   ,`hpapi_pattern`.`length_minimum` AS `lengthMinimum`
+   ,`hpapi_pattern`.`length_maximum` AS `lengthMaximum`
+   ,`hpapi_pattern`.`value_minimum` AS `valueMinimum`
+   ,`hpapi_pattern`.`value_maximum` AS `valueMaximum`
+  FROM `hpapi_dba_table`
+  LEFT JOIN `hpapi_dba_insert` USING (`model`,`table`)
+  LEFT JOIN `hpapi_dba_column` USING (`model`,`table`)
+  LEFT JOIN `hpapi_dba_select` USING (`model`,`table`,`column`,`usergroup`)
+  LEFT JOIN `hpapi_dba_update` USING (`model`,`table`,`column`,`usergroup`)
+  LEFT JOIN `hpapi_pattern` USING (`pattern`)
+  GROUP BY
+      `hpapi_dba_table`.`model`
+     ,`hpapi_dba_table`.`table`
+     ,`hpapi_dba_column`.`column`
+  ORDER BY
+      `hpapi_dba_table`.`model`
+     ,`hpapi_dba_table`.`table`
+     ,`hpapi_dba_column`.`column`
+  ;
+END$$
+
 
 
 DELIMITER ;

@@ -1,6 +1,6 @@
 <?php
 
-// DBA
-define ( 'HPAPI_STR_DBA_GRANT_ALLOW',       'Grant denied'                              );
-define ( 'HPAPI_STR_DBA_TABLE_COLS',        'No columns available from this table'      );
+
+// Error strings
+define ( 'HPAPI_DBA_STR_DB_OBJ',            '301 500 Could not construct database object'                                           );
 
