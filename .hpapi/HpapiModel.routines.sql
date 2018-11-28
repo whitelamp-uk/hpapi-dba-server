@@ -11,7 +11,7 @@ DELIMITER $$
 
 DROP PROCEDURE IF EXISTS `hpapiDbaModelSql`$$
 CREATE PROCEDURE `hpapiDbaModelSql`(
-  IN        `dbModel` VARCHAR(64) CHARSET ascii
+  IN        `modelName` VARCHAR(64) CHARSET ascii
  ,IN        `dbName` VARCHAR(64) CHARSET ascii
 )
 BEGIN
@@ -19,7 +19,7 @@ BEGIN
     CONCAT(
       'INSERT '
      ,'IGNORE INTO `hpapi_dba_table` SET `model`="'
-     ,dbModel
+     ,modelName
      ,'",`table`="'
      ,`TABLE_NAME`
      ,'",`title`="'
@@ -37,7 +37,7 @@ BEGIN
     CONCAT(
       'INSERT '
      ,'IGNORE INTO `hpapi_dba_column` SET `model`="'
-     ,dbModel
+     ,modelName
      ,'",`table`="'
      ,`TABLE_NAME`
      ,'",`column`="'
@@ -492,7 +492,7 @@ END$$
 
 DROP PROCEDURE IF EXISTS `hpapiDbaColumnsTable`$$
 CREATE PROCEDURE `hpapiDbaColumnsTable`(
-  IN        `dbModel` VARCHAR(64) CHARSET ascii
+  IN        `modelName` VARCHAR(64) CHARSET ascii
  ,IN        `dbName` VARCHAR(64) CHARSET ascii
  ,IN        `tableName` VARCHAR(64) CHARSET ascii
 )
@@ -532,7 +532,7 @@ BEGIN
          AND `KEY_COLUMN_USAGE`.`COLUMN_NAME`=`COLUMNS`.`COLUMN_NAME`
   INNER JOIN `hpapi_dba_pattern` USING (`pattern`)
   WHERE `INFORMATION_SCHEMA`.`COLUMNS`.`TABLE_CATALOG`='def'
-    AND `hpapi_dba_table`.`model`=dbModel
+    AND `hpapi_dba_table`.`model`=modelName
     AND `hpapi_dba_table`.`table`=tableName
   GROUP BY
     `hpapi_dba_table`.`model`
@@ -541,20 +541,20 @@ BEGIN
   ORDER BY
     `hpapi_dba_table`.`model`
    ,`hpapi_dba_table`.`table`
-   ,`INFORMATION_SCHEMA`.`COLUMNS`.`ORDINAL POSITION`
+   ,`INFORMATION_SCHEMA`.`COLUMNS`.`ORDINAL_POSITION`
   ;
 END$$
 
 
 DROP PROCEDURE IF EXISTS `hpapiDbaColumnsStrong`$$
 CREATE PROCEDURE `hpapiDbaColumnsStrong`(
-  IN        `dbModel` VARCHAR(64) CHARSET ascii
+  IN        `modelName` VARCHAR(64) CHARSET ascii
  ,IN        `dbName` VARCHAR(64) CHARSET ascii
  ,IN        `tableName` VARCHAR(64) CHARSET ascii
 )
 BEGIN
   SELECT
-    dbModel AS `model`
+    modelName AS `model`
    ,`fgn`.`REFERENCED_TABLE_SCHEMA` AS `database`
    ,`fgn`.`REFERENCED_TABLE_NAME` AS `table`
    ,`hpapi_dba_table`.`title`
@@ -564,14 +564,14 @@ BEGIN
    ,`hpapi_dba_column`.`describes_row`!='0' AS `describesRow`
   FROM `INFORMATION_SCHEMA`.`KEY_COLUMN_USAGE` AS `fgn`
   INNER JOIN `hpapi_dba_table`
-          ON `hpapi_dba_table`.`model`=dbModel
+          ON `hpapi_dba_table`.`model`=modelName
          AND `hpapi_dba_table`.`table`=`REFERENCED_TABLE_NAME`
   LEFT  JOIN `INFORMATION_SCHEMA`.`KEY_COLUMN_USAGE` AS `pri`
           ON `pri`.`TABLE_CATALOG`=`fgn`.`TABLE_CATALOG`
          AND `pri`.`TABLE_SCHEMA`=`fgn`.`REFERENCED_TABLE_SCHEMA`
          AND `pri`.`TABLE_NAME`=`fgn`.`REFERENCED_TABLE_NAME`
   INNER JOIN `hpapi_dba_column` AS `col`
-          ON `col`.`model`=dbModel
+          ON `col`.`model`=modelName
          AND `col`.`table`=`REFERENCED_TABLE_NAME`
          AND `col`.`column`=`REFERENCED_COLUMN_NAME`
          AND (
@@ -588,32 +588,40 @@ BEGIN
      OR `fgn`.`REFERENCED_TABLE_NAME`!=`fgn`.`TABLE_NAME`
     )
   GROUP BY `hpapi_dba_column`.`model`,`hpapi_dba_column`.`table`,`hpapi_dba_column`.`column`
-  ORDER BY `hpapi_dba_column`.`model`,`hpapi_dba_column`.`table`,`fgn`.`ORDINAL POSITION`
+  ORDER BY `hpapi_dba_column`.`model`,`hpapi_dba_column`.`table`,`fgn`.`ORDINAL_POSITION`
   ;
 END$$
 
 
 -- PRIVILEGES
 
-DROP PROCEDURE IF EXISTS `hpapiDbaPrivileges`$$
-CREATE PROCEDURE `hpapiDbaPrivileges`(
+DROP PROCEDURE IF EXISTS `hpapiDbaColumns`$$
+CREATE PROCEDURE `hpapiDbaColumns`(
+  IN        `modelName` VARCHAR(64) CHARSET ascii
+ ,IN        `dbName` VARCHAR(64) CHARSET ascii
 )
 BEGIN
   SELECT
-    CONCAT(
-      `hpapi_dba_table`.`model`
-     ,'::'
-     ,`hpapi_dba_table`.`table`
-     ,'::'
-     ,`hpapi_dba_column`.`column`
-    ) AS `column`
+    `hpapi_dba_table`.`table`
+   ,`hpapi_dba_column`.`column`
+   ,`cols`.`COLUMN_KEY`='PRI' AS `isPrimary`
+   ,`cols`.`EXTRA` LIKE '%auto_increment%' AS `isAutoIncrement`
+   ,GROUP_CONCAT(
+        `hpapi_dba_insert`.`usergroup`
+    SEPARATOR '::') AS `inserters`
+   ,GROUP_CONCAT(
+        `hpapi_dba_select`.`usergroup`
+    SEPARATOR '::') AS `selectors`
+   ,GROUP_CONCAT(
+        `hpapi_dba_update`.`usergroup`
+    SEPARATOR '::') AS `updaters`
+   ,GROUP_CONCAT(
+        CONCAT(`keys`.`CONSTRAINT_NAME`,'.',`keys`.`REFERENCED_TABLE_NAME`,'.',`keys`.`REFERENCED_COLUMN_NAME`)
+    SEPARATOR '::') AS `relations`
    ,`hpapi_dba_table`.`title`
    ,`hpapi_dba_table`.`description`
    ,`hpapi_dba_column`.`heading`
    ,`hpapi_dba_column`.`hint`
-   ,GROUP_CONCAT(`hpapi_dba_insert`.`usergroup` SEPARATOR '::') `usergroupsInsert`
-   ,GROUP_CONCAT(`hpapi_dba_select`.`usergroup` SEPARATOR '::') `usergroupsSelect`
-   ,GROUP_CONCAT(`hpapi_dba_update`.`usergroup` SEPARATOR '::') `usergroupsUpdate`
    ,`hpapi_pattern`.`pattern`
    ,`hpapi_pattern`.`constraints`
    ,`hpapi_pattern`.`expression`
@@ -628,14 +636,23 @@ BEGIN
   LEFT JOIN `hpapi_dba_select` USING (`model`,`table`,`column`,`usergroup`)
   LEFT JOIN `hpapi_dba_update` USING (`model`,`table`,`column`,`usergroup`)
   LEFT JOIN `hpapi_pattern` USING (`pattern`)
+  LEFT JOIN `INFORMATION_SCHEMA`.`COLUMNS` AS `cols`
+          ON `cols`.`TABLE_CATALOG`='def'
+         AND `cols`.`TABLE_SCHEMA`=dbName
+         AND `cols`.`TABLE_NAME`=`hpapi_dba_column`.`table`
+         AND `cols`.`COLUMN_NAME`=`hpapi_dba_column`.`column`
+  LEFT  JOIN `INFORMATION_SCHEMA`.`KEY_COLUMN_USAGE` AS `keys`
+          ON `keys`.`TABLE_CATALOG`=`cols`.`TABLE_CATALOG`
+         AND `keys`.`TABLE_SCHEMA`=`cols`.`TABLE_SCHEMA`
+         AND `keys`.`TABLE_NAME`=`cols`.`TABLE_NAME`
+         AND `keys`.`COLUMN_NAME`=`cols`.`COLUMN_NAME`
+  WHERE `hpapi_dba_table`.`model`=modelName
   GROUP BY
-      `hpapi_dba_table`.`model`
-     ,`hpapi_dba_table`.`table`
+      `hpapi_dba_table`.`table`
      ,`hpapi_dba_column`.`column`
   ORDER BY
-      `hpapi_dba_table`.`model`
-     ,`hpapi_dba_table`.`table`
-     ,`hpapi_dba_column`.`column`
+      `hpapi_dba_table`.`table`
+     ,`cols`.`ORDINAL_POSITION`
   ;
 END$$
 

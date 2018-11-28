@@ -4,145 +4,270 @@ namespace Hpapi;
 
 class Dba {
 
-    public $userId;
-    public $modelDb;
+    public  $userId;
+    public  $model;                                 // Database definition
+    public  $modelDb;                               // Model database name
+    public  $modelName;                             // Model name
+    public  $columns;                               // Model definitions
 
     public function __construct (\Hpapi\Hpapi $hpapi) {
-        $this->hpapi                        = $hpapi;
-        $this->userId                       = $this->hpapi->userId;
+        $this->hpapi                                = $hpapi;
+        $this->userId                               = $this->hpapi->userId;
     }
 
     public function __destruct ( ) {
     }
 
+    // MODEL DEFINITION
 
-
-    // PRIVILEGES
-
-    private function callPrivileges () {
+    private function columnsCall () {
         try {
-            $columns                                = $this->db->call (
-                'hpapiDbaPrivileges'
+            $cs                                     = $this->hpapi->dbCall (
+                'hpapiDbaColumns'
+               ,$this->modelName
+               ,$this->modelDb
             );
         }
         catch (\Exception $e) {
-            $this->diagnostic ($e->getMessage());
-            $this->object->response->error          = HPAPI_STR_ERROR_DB;
+            $this->hpapi->diagnostic ($e->getMessage());
+            $this->hpapi->object->response->error   = HPAPI_STR_ERROR_DB;
             return false;
         }
-        $privileges                                 = array ();
-        foreach ($columns as $c) {
-/*
-            $method                                 = $m['method'];
-            unset ($m['method']);
-            if (!array_key_exists($method,$privileges)) {
-                $privileges[$method]                = array ();
-                $privileges[$method]['usergroups']  = array ();
-                $privileges[$method]['arguments']   = array ();
-                $privileges[$method]['sprs']        = array ();
-                $privileges[$method]['package']     = $m['packageNotes'];
-                $privileges[$method]['notes']       = $m['methodNotes'];
-                $privileges[$method]['label']       = $m['methodLabel'];
+        $columns                                    = array ();
+        foreach ($cs as $c) {
+            if ($c['inserters']) {
+                $c['inserters']                     = explode ('::',$c['inserters']);
             }
-            if (!$m['usergroup']) {
-                continue;
+            else {
+                $c['inserters']                     = array ();
             }
-            if (!in_array($m['usergroup'],$privileges[$method]['usergroups'])) {
-                array_push ($privileges[$method]['usergroups'],$m['usergroup']);
+            if ($c['selectors']) {
+                $c['selectors']                     = explode ('::',$c['selectors']);
             }
-            if (!$m['argument']) {
-                continue;
+            else {
+                $c['selectors']                     = array ();
             }
-            if (array_key_exists($m['argument'],$privileges[$method]['arguments'])) {
-                continue;
+            if ($c['updaters']) {
+                $c['updaters']                      = explode ('::',$c['updaters']);
             }
-            unset ($m['usergroup']);
-            unset ($m['packageNotes']);
-            unset ($m['methodNotes']);
-            unset ($m['packageNotes']);
-            $privileges[$method]['arguments'][$m['argument']] = $m;
-*/
+            else {
+                $c['updaters']                      = array ();
+            }
+            if ($c['relations']) {
+                $c['relations']                     = explode ('::',$c['relations']);
+            }
+            else {
+                $c['relations']                     = array ();
+            }
+            array_push ($columns,$c);
+        }
+        return $columns;
+    }
+
+    private function columnsLoad ( ) {
+        if (HPAPI_DBA_COLS_DYNAMIC) {
+            return $this->columnsCall ();
+        }
+        else {
+            $file                                   = HPAPI_DBA_COLS_DIR.'/'.$model.HPAPI_DBA_COLS_FILE_SUFFIX;
+            if (is_readable($file)) {
+                $privileges                         = require $file;
+            }
+            if (!is_array($privileges)) {
+                $privileges                         = $this->columnsCall ();
+                try {
+                    $this->hpapi->exportArray ($file,$privileges);
+                }
+                catch (\Exception $e) {
+                    $this->hpapi->diagnostic ($e->getMessage());
+                    $this->hpapi->object->response->error = HPAPI_DBA_STR_PRIV_WRITE;
+                    return false;
+                }
+            }
         }
         return $privileges;
     }
 
-
-
-
-    // MODEL DATABASE
-
-    public function model ($model) {
+    private function columnsReset ($model) {
+        if (!is_writable(HPAPI_DBA_COLS_DIR)) {
+            throw new \Exception (HPAPI_DBA_STR_COLS_DIR);
+            return false;
+        }
         try {
-            return new \Hpapi\DbaDb ($this->hpapi,$this->hpapi->models->$model);
+            $file                               = HPAPI_DBA_COLS_DIR.'/'.$model.HPAPI_DBA_COLS_FILE_SUFFIX;
+            $fp                                 = fopen ($file,'w');
+            fwrite ($fp,"<?php\nreturn false;\n");
+            fclose ($fp);
+            chmod ($file,0666);
         }
         catch (\Exception $e) {
+            throw new \Exception ($e->getMessage);
+            return false;
+        }
+    }
+
+    private function inputValidate ($object) {
+        if (!is_object($object)) {
+            $this->hpapi->object->response->error   = HPAPI_DBA_STR_IN_OBJECT;
+            return false;
+        }
+        if (!property_exists($object,'table')) {
+            $this->hpapi->object->response->error   = HPAPI_DBA_STR_IN_TABLE;
+            return false;
+        }
+        return true;
+    }
+
+    private function modelDbName ($dsn) {
+        $parts                                      = explode (';',$dsn);
+        foreach ($parts as $part) {
+            $kv                                     = explode ('=',$part);
+            if ($kv[0]=='dbname') {
+                return $kv[1];
+            }
+        }
+    }
+
+    private function modelLoad ($model) {
+        if (!property_exists($this->hpapi->models,$model)) {
+            $this->hpapi->object->response->error   = HPAPI_DBA_STR_MODEL;
+            return false;
+        }
+        $this->model                                = $this->hpapi->models->{$model};
+        $this->modelDb                              = $this->modelDbName ($this->model->dsn);
+        $this->modelName                            = $model;
+        $this->columns                              = $this->columnsLoad ();
+        if (!$this->columns) {
+            return false;
+        }
+        try {
+            $this->db                               = new \Hpapi\DbaDb ($this->hpapi,$this->model);
+            return true;
+        }
+        catch (\Exception $e) {
+            $this->hpapi->object->response->error   = HPAPI_DBA_STR_DB_OBJ;
             $this->hpapi->diagnostic ($e->getMessage());
             return false;
         }
     }
 
+    private function modelTable ($tName) {
+        $table                                      = null;
+        $relations                                  = array ();
+        foreach ($this->columns as $column) {
+            if ($column['table']!=$tName) {
+                continue;
+            }
+            if (!$table) {
+                $table                              = new \stdClass ();
+                $table->model                       = $this->modelName;
+                $table->table                       = $tName;
+                $table->mayInsert                   = $this->usergroupMatch ($column['inserters']);
+                $table->primary                     = array ();
+                $table->relations                   = new \stdClass ();
+                $table->title                       = $column['title'];
+                $table->description                 = $column['description'];
+                $table->columns                     = new \stdClass ();
+            }
+            if ($column['isPrimary']) {
+                array_push ($table->primary,$column['column']);
+            }
+            if ($column['relations']) {
+                foreach ($column['relations'] as $r) {
+                    $ktc                            = explode ('.',$r);
+                    if (!property_exists($table->relations,$ktc[0])) {
+                        $table->relations->{$ktc[0]} = new \stdClass ();
+                        $table->relations->{$ktc[0]}->table = $ktc[1];
+                        $table->relations->{$ktc[0]}->columns = new \stdClass ();
+                    }
+                    $table->relations->{$ktc[0]}->columns->{$column['column']} = $ktc[2];
+                }
+            }
+            $c                                      = new \stdClass ();
+            $c->maySelect                           = $this->usergroupMatch ($column['selectors']);
+            $c->mayUpdate                           = $this->usergroupMatch ($column['updaters']);
+            $cname                                  = $column['column'];
+            unset ($column['table']);
+            unset ($column['inserters']);
+            unset ($column['relations']);
+            unset ($column['title']);
+            unset ($column['description']);
+            unset ($column['column']);
+            unset ($column['selectors']);
+            unset ($column['updaters']);
+            foreach ($column as $k=>$v) {
+                if ($k=='table' || $k=='column') {
+                    continue;
+                }
+                $c->{$k}                            = $v;
+            }
+            $table->columns->{$cname}               = $c;
+        }
+        return $table;
+    }
 
+    private function usergroupMatch ($usergroups) {
+        foreach ($this->hpapi->usergroups as $g) {
+            if (in_array($g['usergroup'],$usergroups)) {
+                return true;
+            }
+        }
+        return false;
+    }
 
-    // TABLE ADMIN
+    // DATA MANIPULATION
 
     public function rowInsert ($object) {
-
-
-$object = '{
-    "model" : "BurdenAndBurden"
-   ,"table" : "bab_fundraiser"
-   ,"row" : {
-        "deleted" : 0
-       ,"badge_number" : 34568
-       ,"teamleader_id" : 1
-       ,"unavailable_currently" : 0
-       ,"known_as" : "Johnny"
-       ,"name_family" : "Rank"
-       ,"name_given" : "John"
-       ,"employmenttype_code" : "S"
-       ,"bond_percentage" : 20
-       ,"weekly_hours" : 35
-       ,"created" : "2018-11-10 17:42:32"
-       ,"updated" : "2018-11-10 18:38:20"        
-    }
-}';
-$object = json_decode ($object,false,HPAPI_JSON_DEPTH);
-
-        if (!($db=$this->model($object->model))) {
-            $this->hpapi->reponse->error    = HPAPI_DBA_STR_DB_OBJ;
+        if (!$this->inputValidate($object)) {
             return false;
         }
-
-
-
-
+        if (!property_exists($object,'row') || !is_object($object->row)) {
+            $this->hpapi->object->response->error       = HPAPI_DBA_STR_IN_ROW;
+            return false;
+        }
+        if (!$this->modelLoad($object->model)) {
+            return false;
+        }
+        $table = $this->modelTable ($object->table);
+        $this->db->setQueryType ('insert');
+        foreach ($object->row as $column=>$value) {
+            if (!property_exists($table->columns,$column)) {
+                $this->hpapi->object->response->error   = HPAPI_DBA_STR_IN_COL_EXIST.' "'.$column.'"';
+                return false;
+            }
+            if (!$table->columns->{$column}->mayUpdate) {
+                $this->hpapi->object->response->error   = HPAPI_DBA_STR_IN_COL_PRIV_UPDATE.' "'.$column.'"';
+                return false;
+            }
+            if ($table->columns->{$column}->isAutoIncrement) {
+                $this->hpapi->object->response->error   = HPAPI_DBA_STR_IN_COL_AUTO_INC.' "'.$column.'"';
+                return false;
+            }
+            $this->db->addColumn ($column,$value);
+        }
+        $this->db->queryBuild ();
+        $this->db->queryExecute ();
     }
 
     public function rowUpdate ($object) {
-        if (!($db=$this->model($object->model))) {
-            $this->hpapi->reponse->error    = HPAPI_DBA_STR_DB_OBJ;
+        if (!$this->modelLoad($object->model)) {
             return false;
         }
     }
 
     public function rowsSelect ($object) {
-        if (!($db=$this->model($object->model))) {
-            $this->hpapi->reponse->error    = HPAPI_DBA_STR_DB_OBJ;
+        if (!$this->modelLoad($object->model)) {
             return false;
         }
     }
 
     public function tupleUpdate ($object) {
-        if (!($db=$this->model($object->model))) {
-            $this->hpapi->reponse->error    = HPAPI_DBA_STR_DB_OBJ;
+        if (!$this->modelLoad($object->model)) {
             return false;
         }
     }
 
-
-
-
-    // GRANT PERMISSIONS
+    // MANIPULATING PERMISSIONS
 
     public function grantAllowed ($type,$usergroup='') {
         try {
@@ -165,11 +290,11 @@ $object = json_decode ($object,false,HPAPI_JSON_DEPTH);
         return false;
     }
 
-    // ADMINISTRATE ACCESS TO USER GROUPS
+    // MANIPULATING USER GROUP MEMBERSHIP
 
     public function grantUsergroupToUser ($usergroup,$user_uuid) {
         if (!$this->grantAllowed('membership',$usergroup)) {
-            throw new \Exception (HPAPI_STR_DBA_GRANT_ALLOW);
+            throw new \Exception (HPAPI_DBA_STR_GRANT_ALLOW);
             return false;
         }
         try {
@@ -188,7 +313,7 @@ $object = json_decode ($object,false,HPAPI_JSON_DEPTH);
 
     public function revokeUsergroupFromUser ($usergroup,$user_uuid) {
         if (!$this->grantAllowed('membership',$usergroup)) {
-            throw new \Exception (HPAPI_STR_DBA_GRANT_ALLOW);
+            throw new \Exception (HPAPI_DBA_STR_GRANT_ALLOW);
             return false;
         }
         try {
@@ -233,11 +358,11 @@ $object = json_decode ($object,false,HPAPI_JSON_DEPTH);
         return $users;
     }
 
-    // ADMINISTRATE ACCESS TO METHODS
+    // MANIPULATE METHOD ACCESS
 
     public function grantMethodToUsergroup ($vendor,$package,$class,$method,$usergroup) {
         if (!$this->grantAllowed('run',$usergroup)) {
-            throw new \Exception (HPAPI_STR_DBA_GRANT_ALLOW);
+            throw new \Exception (HPAPI_DBA_STR_GRANT_ALLOW);
             return false;
         }
         try {
@@ -259,7 +384,7 @@ $object = json_decode ($object,false,HPAPI_JSON_DEPTH);
 
     public function revokeMethodFromUsergroup ($vendor,$package,$class,$method,$usergroup) {
         if (!$this->grantAllowed('run',$usergroup)) {
-            throw new \Exception (HPAPI_STR_DBA_GRANT_ALLOW);
+            throw new \Exception (HPAPI_DBA_STR_GRANT_ALLOW);
             return false;
         }
         try {
@@ -310,11 +435,11 @@ $object = json_decode ($object,false,HPAPI_JSON_DEPTH);
         return $usergroups;
     }
 
-    // ADMINISTRATE ACCESS TO STORED PROCEDURES
+    // MANIPULATE STORED PROCEDURE ACCESS
 
     public function grantSprToMethod ($model,$spr,$vendor,$package,$class,$method) {
         if (!$this->grantAllowed('call')) {
-            throw new \Exception (HPAPI_STR_DBA_GRANT_ALLOW);
+            throw new \Exception (HPAPI_DBA_STR_GRANT_ALLOW);
             return false;
         }
         try {
@@ -337,7 +462,7 @@ $object = json_decode ($object,false,HPAPI_JSON_DEPTH);
 
     public function revokeSprFromMethod ($model,$spr,$vendor,$package,$class,$method) {
         if (!$this->grantAllowed('call')) {
-            throw new \Exception (HPAPI_STR_DBA_GRANT_ALLOW);
+            throw new \Exception (HPAPI_DBA_STR_GRANT_ALLOW);
             return false;
         }
         try {
@@ -390,11 +515,11 @@ $object = json_decode ($object,false,HPAPI_JSON_DEPTH);
         return $sprs;
     }
 
-    // ADMINISTRATE PERMISSION TO INSERT
+    // MANIPULATE INSERT PERMISSIONS
 
     public function grantInsertToUsergroup ($model,$table,$usergroup) {
         if (!$this->grantAllowed('insert',$usergroup)) {
-            throw new \Exception (HPAPI_STR_DBA_GRANT_ALLOW);
+            throw new \Exception (HPAPI_DBA_STR_GRANT_ALLOW);
             return false;
         }
         try {
@@ -414,7 +539,7 @@ $object = json_decode ($object,false,HPAPI_JSON_DEPTH);
 
     public function revokeInsertFromUsergroup ($model,$table,$usergroup) {
         if (!$this->grantAllowed('insert',$usergroup)) {
-            throw new \Exception (HPAPI_STR_DBA_GRANT_ALLOW);
+            throw new \Exception (HPAPI_DBA_STR_GRANT_ALLOW);
             return false;
         }
         try {
@@ -448,11 +573,71 @@ $object = json_decode ($object,false,HPAPI_JSON_DEPTH);
     }
 
 
-    // ADMINISTRATE PERMISSION TO UPDATE
+    // MANIPULATE SELECT PERMISSIONS
+
+    public function grantSelectToUsergroup ($model,$table,$column,$usergroup) {
+        if (!$this->grantAllowed('select',$usergroup)) {
+            throw new \Exception (HPAPI_DBA_STR_GRANT_ALLOW);
+            return false;
+        }
+        try {
+            $this->hpapi->dbCall (
+                'hpapiDbaSelectInsert'
+               ,$model
+               ,$table
+               ,$column
+               ,$usergroup
+            );
+        }
+        catch (\Exception $e) {
+            throw new \Exception ($e->getMessage());
+            return false;
+        }
+        return true;
+    }
+
+    public function revokeSelectFromUsergroup ($model,$table,$column,$usergroup) {
+        if (!$this->grantAllowed('select',$usergroup)) {
+            throw new \Exception (HPAPI_DBA_STR_GRANT_ALLOW);
+            return false;
+        }
+        try {
+            $this->hpapi->dbCall (
+                'hpapiDbaSelectDelete'
+               ,$model
+               ,$table
+               ,$column
+               ,$usergroup
+            );
+        }
+        catch (\Exception $e) {
+            throw new \Exception ($e->getMessage());
+            return false;
+        }
+        return true;
+    }
+
+    public function showSelectsForUsergroup ($model,$table='*',$column='*') {
+        try {
+            $selects    = $this->hpapi->dbCall (
+                'hpapiDbaSelectsForUsergroup'
+               ,$model
+               ,$table
+               ,$column
+            );
+        }
+        catch (\Exception $e) {
+            throw new \Exception ($e->getMessage());
+            return false;
+        }
+        return $selects;
+    }
+
+    // MANIPULATE UPDATE PERMISSIONS
 
     public function grantUpdateToUsergroup ($model,$table,$column,$usergroup) {
         if (!$this->grantAllowed('update',$usergroup)) {
-            throw new \Exception (HPAPI_STR_DBA_GRANT_ALLOW);
+            throw new \Exception (HPAPI_DBA_STR_GRANT_ALLOW);
             return false;
         }
         try {
@@ -473,7 +658,7 @@ $object = json_decode ($object,false,HPAPI_JSON_DEPTH);
 
     public function revokeUpdateFromUsergroup ($model,$table,$column,$usergroup) {
         if (!$this->grantAllowed('update',$usergroup)) {
-            throw new \Exception (HPAPI_STR_DBA_GRANT_ALLOW);
+            throw new \Exception (HPAPI_DBA_STR_GRANT_ALLOW);
             return false;
         }
         try {
@@ -510,39 +695,14 @@ $object = json_decode ($object,false,HPAPI_JSON_DEPTH);
 
     // DESCRIBE DATA STRUCTURE
 
-    public function describeTable ($modelName,$tableName) {
-        $dbName                 = $this->hpapi->pdoDbName ($this->hpapi->models->{$modelName}->dsn);
-        try {
-            $columns            = $this->hpapi->dbCall (
-                'hpapiDbaColumnsTable'
-               ,$dbName
-               ,$tableName
-            );
-            $columns            = $this->hpapi->parse2D ($columns);
-        }
-        catch (\Exception $e) {
-            throw new \Exception ($e->getMessage());
+    public function describeTable ($object) {
+        if (!$this->inputValidate($object)) {
             return false;
         }
-        if (!count($columns)) {
-            throw new \Exception (HPAPI_STR_DBA_TABLE_COLS);
+        if (!$this->modelLoad($object->model)) {
             return false;
         }
-        $table                      = new \stdClass ();
-        $table->model               = $columns[0]->model;
-        $table->table               = $columns[0]->table;
-        $table->title               = $columns[0]->title;
-        $table->description         = $columns[0]->description;
-        $table->columns             = array ();
-        foreach ($columns as $c) {
-            unset ($c->title);
-            unset ($c->description);
-            array_push ($table->columns,$c);
-        }
-        return $table;
-        $table->relationsStrong     = $this->describeRelations ($dbName,$tableName,false);
-        $table->relationsWeak       = $this->describeRelations ($dbName,$tableName,'weak');
-        return $table;
+        return $this->modelTable ($object->table);
    }
 
     public function describeRelations ($dbName,$tableName,$weak=false) {
@@ -559,6 +719,7 @@ $object = json_decode ($object,false,HPAPI_JSON_DEPTH);
                     'hpapiDbaColumnsStrong'
                    ,$dbName
                    ,$tableName
+                );
             }
             $columns                = $this->hpapi->parse2D ($columns);
         }
