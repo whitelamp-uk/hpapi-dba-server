@@ -2,7 +2,6 @@
 
 // Error strings - \Hpapi\Dba
 define ( 'HPAPI_DBA_STR_MODEL',                 '301 400 Model not identified'                                                      );
-define ( 'HPAPI_DBA_STR_DB_OBJ',                '302 500 Could not construct database object'                                       );
 define ( 'HPAPI_DBA_STR_COLS_DIR',              '303 500 Column definitions directory is not writable'                              );
 define ( 'HPAPI_DBA_STR_COLS_WRITE',            '304 500 Could not write model column definitions'                                  );
 define ( 'HPAPI_DBA_STR_IN_OBJECT',             '305 400 Input argument was not an object'                                          );

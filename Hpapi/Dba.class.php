@@ -35,29 +35,13 @@ class Dba {
         }
         $columns                                    = array ();
         foreach ($cs as $c) {
-            if ($c['inserters']) {
-                $c['inserters']                     = explode ('::',$c['inserters']);
-            }
-            else {
-                $c['inserters']                     = array ();
-            }
-            if ($c['selectors']) {
-                $c['selectors']                     = explode ('::',$c['selectors']);
-            }
-            else {
-                $c['selectors']                     = array ();
-            }
-            if ($c['updaters']) {
-                $c['updaters']                      = explode ('::',$c['updaters']);
-            }
-            else {
-                $c['updaters']                      = array ();
-            }
-            if ($c['relations']) {
-                $c['relations']                     = explode ('::',$c['relations']);
-            }
-            else {
-                $c['relations']                     = array ();
+            foreach (array('inserters','selectors','updaters','relations') as $property) {
+                if ($c[$property]) {
+                    $c[$property]                       = explode ('::',$c[$property]);
+                }
+                else {
+                    $c[$property]                       = array ();
+                }
             }
             array_push ($columns,$c);
         }
@@ -118,7 +102,7 @@ class Dba {
 
     private function modelLoad ($model) {
         if (!property_exists($this->hpapi->models,$model)) {
-            $this->hpapi->object->response->error   = HPAPI_DBA_STR_MODEL;
+            throw new \Exception (HPAPI_DBA_STR_MODEL);
             return false;
         }
         $this->model                                = $this->hpapi->models->{$model};
@@ -126,6 +110,7 @@ class Dba {
         $this->modelName                            = $model;
         $this->columns                              = $this->columnsLoad ();
         if (!$this->columns) {
+            throw new \Exception (HPAPI_DBA_STR_MODEL);
             return false;
         }
         try {
@@ -133,8 +118,8 @@ class Dba {
             return true;
         }
         catch (\Exception $e) {
-            $this->hpapi->object->response->error   = HPAPI_DBA_STR_DB_OBJ;
             $this->hpapi->diagnostic ($e->getMessage());
+            throw new \Exception (HPAPI_DBA_STR_MODEL);
             return false;
         }
     }
@@ -224,10 +209,14 @@ class Dba {
             return false;
         }
         if (!property_exists($object,'row') || !is_object($object->row)) {
-            $this->hpapi->object->response->error           = HPAPI_DBA_STR_IN_ROW;
+            throw new \Exception (HPAPI_DBA_STR_IN_ROW);
             return false;
         }
-        if (!$this->modelLoad($object->model)) {
+        try {
+            $this->modelLoad ($object->model);
+        }
+        catch (\Exception $e) {
+            throw new \Exception ($e->getMessage());
             return false;
         }
         $this->db->setQueryType ('insert');
@@ -281,21 +270,38 @@ class Dba {
     }
 
     public function rowUpdate ($object) {
-        if (!$this->modelLoad($object->model)) {
+        if (!$this->inputValidate($object)) {
             return false;
         }
+        if (!property_exists($object,'row') || !is_object($object->row)) {
+            throw new \Exception (HPAPI_DBA_STR_IN_ROW);
+            return false;
+        }
+        try {
+            $this->modelLoad ($object->model);
+        }
+        catch (\Exception $e) {
+            throw new \Exception ($e->getMessage());
+            return false;
+        }
+        $this->db->setQueryType ('update');
+        $this->db->setTable ($object->table);
+        return "Getting there...";
     }
 
     public function rowsSelect ($object) {
-        if (!$this->modelLoad($object->model)) {
+        if (!$this->inputValidate($object)) {
             return false;
         }
-    }
-
-    public function tupleUpdate ($object) {
-        if (!$this->modelLoad($object->model)) {
+        try {
+            $this->modelLoad ($object->model);
+        }
+        catch (\Exception $e) {
+            throw new \Exception ($e->getMessage());
             return false;
         }
+        $this->db->setQueryType ('select');
+        $this->db->setTable ($object->table);
     }
 
 // MANIPULATING PERMISSIONS
