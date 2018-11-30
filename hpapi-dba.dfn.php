@@ -12,6 +12,7 @@ define ( 'HPAPI_DBA_STR_IN_ROW',                '308 400 Input object missing ro
 define ( 'HPAPI_DBA_STR_IN_COL_EXISTS',         '309 400 Column does not exist'                                                     );
 define ( 'HPAPI_DBA_STR_IN_COL_PRIV_UPDATE',    '310 403 Column update denied'                                                      );
 define ( 'HPAPI_DBA_STR_IN_COL_AUTO_INC',       '311 403 Cannot update auto-increment column'                                       );
+define ( 'HPAPI_DBA_STR_IN_COL_VALID',          '312 400 Input value is invalid'                                                    );
 
 
 define ( 'HPAPI_DBA_STR_GRANT_ALLOW',           '341 403 Grant was not allowed'                                                     );

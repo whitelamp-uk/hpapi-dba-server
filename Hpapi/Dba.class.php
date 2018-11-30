@@ -18,7 +18,7 @@ class Dba {
     public function __destruct ( ) {
     }
 
-    // MODEL DEFINITION
+// MODEL DEFINITION
 
     private function columnsCall () {
         try {
@@ -104,18 +104,6 @@ class Dba {
             throw new \Exception ($e->getMessage);
             return false;
         }
-    }
-
-    private function inputValidate ($object) {
-        if (!is_object($object)) {
-            $this->hpapi->object->response->error   = HPAPI_DBA_STR_IN_OBJECT;
-            return false;
-        }
-        if (!property_exists($object,'table')) {
-            $this->hpapi->object->response->error   = HPAPI_DBA_STR_IN_TABLE;
-            return false;
-        }
-        return true;
     }
 
     private function modelDbName ($dsn) {
@@ -206,6 +194,20 @@ class Dba {
         return $table;
     }
 
+// UTILITIES
+
+    private function inputValidate ($object) {
+        if (!is_object($object)) {
+            $this->hpapi->object->response->error   = HPAPI_DBA_STR_IN_OBJECT;
+            return false;
+        }
+        if (!property_exists($object,'table')) {
+            $this->hpapi->object->response->error   = HPAPI_DBA_STR_IN_TABLE;
+            return false;
+        }
+        return true;
+    }
+
     private function usergroupMatch ($usergroups) {
         foreach ($this->hpapi->usergroups as $g) {
             if (in_array($g['usergroup'],$usergroups)) {
@@ -215,7 +217,7 @@ class Dba {
         return false;
     }
 
-    // DATA MANIPULATION
+// DATA MANIPULATION
 
     public function rowInsert ($object) {
         if (!$this->inputValidate($object)) {
@@ -229,7 +231,7 @@ class Dba {
             return false;
         }
         $table = $this->modelTable ($object->table);
-        $this->db->setQueryType ('insert');
+        $count = 0;
         foreach ($object->row as $column=>$value) {
             if (!property_exists($table->columns,$column)) {
                 $this->hpapi->object->response->error   = HPAPI_DBA_STR_IN_COL_EXIST.' "'.$column.'"';
@@ -243,8 +245,17 @@ class Dba {
                 $this->hpapi->object->response->error   = HPAPI_DBA_STR_IN_COL_AUTO_INC.' "'.$column.'"';
                 return false;
             }
+            try {
+                $count++;
+                $this->hpapi->validation ($table->columns->{$column}->heading,$count,$table->columns->{$column},$value);
+            }
+            catch (\Exception $e) {
+                $this->hpapi->object->response->error   = HPAPI_DBA_STR_IN_COL_VALID.': '.$e->getMessage();
+            }
             $this->db->addColumn ($column,$value);
         }
+        $this->db->setQueryType ('insert');
+        $this->db->setTable ($object->table);
         $this->db->queryBuild ();
         $this->db->queryExecute ();
     }
@@ -267,7 +278,7 @@ class Dba {
         }
     }
 
-    // MANIPULATING PERMISSIONS
+// MANIPULATING PERMISSIONS
 
     public function grantAllowed ($type,$usergroup='') {
         try {
