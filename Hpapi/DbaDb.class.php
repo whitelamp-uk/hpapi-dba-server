@@ -21,40 +21,52 @@ class DbaDb extends \Hpapi\Db {
                 )
             );
     private $tableName;
-    private $columns;
+    private $columns = null;
+    private $primary = null;
 
     public function __construct (\Hpapi\Hpapi $hpapi,$model) {
         parent::__construct ($hpapi,$model);
     }
 
     public function addColumn ($columnName,$value=null) {
-        $this->columns[$columnName] = $this->pdoCast ($value);
+        if ($this->columns===null) {
+            $this->columns = new \stdClass ();
+        }
+        $this->columns->{$columnName} = $this->pdoCast ($value);
+    }
+
+    public function addPrimary ($columnName,$value=null) {
+        if ($this->primary===null) {
+            $this->primary = new \stdClass ();
+        }
+        $this->primary->{$columnName} = $this->pdoCast ($value);
     }
 
     public function queryBuild ( ) {
         try {
             $query  = str_replace ('<table/>',$this->tableName,$this->queryDefn[$this->queryType]['start']);
-            if ($this->queryType=='select') {
-                echo $query."\n";
-                die ();
-                return;
-            }
             $loop   = array ();
             foreach ($this->columns as $c=>$v) {
                 array_push ($loop,str_replace('<column/>',$c,$this->queryDefn[$this->queryType]['column']));
             }
             $query .= implode (',',$loop);
+            if ($this->queryType=='select') {
+                return;
+            }
             if ($this->queryType=='update') {
-                echo $query."\n";
-                die ();
+                if ($this->primary==null) {
+                    throw new \Exception (HPAPI_DBA_STR_QUERY_PRI);
+                    return false;
+                }
+die ("The next bit...");
             }
             $this->query = $query;
-            return true;
         }
         catch (\Exception $e) {
             throw new \Exception ($e->getMessage());
             return false;
         }
+        return true;
     }
 
     public function queryExecute ( ) {
@@ -67,7 +79,7 @@ class DbaDb extends \Hpapi\Db {
             return false;
         }
         $i = 0;
-        foreach ($this->columns as $c=>$param) {
+        foreach ($this->columns as $param) {
             // Bind value to placeholder
             $i++;
             try {

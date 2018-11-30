@@ -20,7 +20,7 @@ class Dba {
 
 // MODEL DEFINITION
 
-    private function columnsCall () {
+    protected function columnsCall () {
         try {
             $cs                                     = $this->hpapi->dbCall (
                 'hpapiDbaColumns'
@@ -48,7 +48,7 @@ class Dba {
         return $columns;
     }
 
-    private function columnsLoad ( ) {
+    protected function columnsLoad ( ) {
         if (HPAPI_DBA_COLS_DYNAMIC) {
             return $this->columnsCall ();
         }
@@ -72,7 +72,7 @@ class Dba {
         return $privileges;
     }
 
-    private function columnsReset ($model) {
+    protected function columnsReset ($model) {
         if (!is_writable(HPAPI_DBA_COLS_DIR)) {
             throw new \Exception (HPAPI_DBA_STR_COLS_DIR);
             return false;
@@ -90,7 +90,7 @@ class Dba {
         }
     }
 
-    private function modelDbName ($dsn) {
+    protected function modelDbName ($dsn) {
         $parts                                      = explode (';',$dsn);
         foreach ($parts as $part) {
             $kv                                     = explode ('=',$part);
@@ -100,7 +100,7 @@ class Dba {
         }
     }
 
-    private function modelLoad ($model) {
+    protected function modelLoad ($model) {
         if (!property_exists($this->hpapi->models,$model)) {
             throw new \Exception (HPAPI_DBA_STR_MODEL);
             return false;
@@ -124,7 +124,7 @@ class Dba {
         }
     }
 
-    private function modelTable ($tName) {
+    protected function modelTable ($tName) {
         $table                                      = null;
         $relations                                  = array ();
         foreach ($this->columns as $column) {
@@ -181,19 +181,100 @@ class Dba {
 
 // UTILITIES
 
-    private function inputValidate ($object) {
+    protected function inputValidate ($object) {
         if (!is_object($object)) {
-            $this->hpapi->object->response->error   = HPAPI_DBA_STR_IN_OBJECT;
+            throw new \Exception (HPAPI_DBA_STR_IN_OBJECT);
             return false;
         }
         if (!property_exists($object,'table')) {
-            $this->hpapi->object->response->error   = HPAPI_DBA_STR_IN_TABLE;
+            thrown new \Exception (HPAPI_DBA_STR_IN_TABLE);
+            return false;
+        }
+        if (!property_exists($object,'row') || !is_object($object->row)) {
+            throw new \Exception (HPAPI_DBA_STR_IN_ROW);
             return false;
         }
         return true;
     }
 
-    private function usergroupMatch ($usergroups) {
+    protected function query ( ) {
+        try {
+            $this->db->queryBuild ();
+        }
+        catch (\Exception $e) {
+            throw new \Exception (HPAPI_DBA_STR_QUERY_BUILD.': '.$e->getMessage());
+            return false;
+        }
+        try {
+            return $this->db->queryExecute ();
+        }
+        catch (\Exception $e) {
+            throw new \Exception (HPAPI_DBA_STR_QUERY_EXEC.': '.$e->getMessage());
+            return false;
+        }
+    }
+
+    protected function loadPrimary ($primary,$columns) {
+        $count = 0;
+        try {
+            foreach ($primary as $column=>$value) {
+                if (!property_exists($table->columns,$column)) {
+                    throw new \Exception (HPAPI_DBA_STR_IN_COL_EXIST.' "'.$column.'"');
+                    return false;
+                }
+                try {
+                    $count++;
+                    $this->hpapi->validation ($columns->{$column}->heading,$count,$value,$columns->{$column});
+                }
+                catch (\Exception $e) {
+                    throw new \Exception (HPAPI_DBA_STR_IN_COL_VALID.': '.$e->getMessage());
+                    return false;
+                }
+                $this->db->addPrimary ($column,$value);
+            }
+        }
+        catch (\Exception $e) {
+            throw new \Exception (HPAPI_DBA_STR_QUERY_VALID.': '.$e->getMessage());
+            return false;
+        }
+        return true;
+    }
+
+    protected function loadRow ($row,$columns) {
+        $count = 0;
+        try {
+            foreach ($row as $column=>$value) {
+                if (!property_exists($table->columns,$column)) {
+                    throw new \Exception (HPAPI_DBA_STR_IN_COL_EXIST.' "'.$column.'"');
+                    return false;
+                }
+                if (!$table->columns->{$column}->mayUpdate) {
+                    throw new \Exception (HPAPI_DBA_STR_IN_COL_PRIV_UPDATE.' "'.$column.'"');
+                    return false;
+                }
+                if ($table->columns->{$column}->isAutoIncrement) {
+                    throw new \Exception (HPAPI_DBA_STR_IN_COL_AUTO_INC.' "'.$column.'"');
+                    return false;
+                }
+                try {
+                    $count++;
+                    $this->hpapi->validation ($columns->{$column}->heading,$count,$value,$columns->{$column});
+                }
+                catch (\Exception $e) {
+                    throw new \Exception (HPAPI_DBA_STR_IN_COL_VALID.': '.$e->getMessage());
+                    return false;
+                }
+                $this->db->addColumn ($column,$value);
+            }
+        }
+        catch (\Exception $e) {
+            throw new \Exception (HPAPI_DBA_STR_QUERY_VALID.': '.$e->getMessage());
+            return false;
+        }
+        return true;
+    }
+
+    protected function usergroupMatch ($usergroups) {
         foreach ($this->hpapi->usergroups as $g) {
             if (in_array($g['usergroup'],$usergroups)) {
                 return true;
@@ -206,102 +287,78 @@ class Dba {
 
     public function rowInsert ($object) {
         if (!$this->inputValidate($object)) {
-            return false;
-        }
-        if (!property_exists($object,'row') || !is_object($object->row)) {
-            throw new \Exception (HPAPI_DBA_STR_IN_ROW);
+            throw new \Exception ($e->getMessage());
             return false;
         }
         try {
             $this->modelLoad ($object->model);
+            $this->db->setQueryType ('insert');
+            $this->db->setTable ($object->table);
+            $table = $this->modelTable ($object->table);
         }
         catch (\Exception $e) {
             throw new \Exception ($e->getMessage());
             return false;
         }
-        $this->db->setQueryType ('insert');
-        $this->db->setTable ($object->table);
-        $table = $this->modelTable ($object->table);
-        $count = 0;
         try {
-            foreach ($object->row as $column=>$value) {
-                if (!property_exists($table->columns,$column)) {
-                    $this->hpapi->object->response->error   = HPAPI_DBA_STR_IN_COL_EXIST.' "'.$column.'"';
-                    return false;
-                }
-                if (!$table->columns->{$column}->mayUpdate) {
-                    $this->hpapi->object->response->error   = HPAPI_DBA_STR_IN_COL_PRIV_UPDATE.' "'.$column.'"';
-                    return false;
-                }
-                if ($table->columns->{$column}->isAutoIncrement) {
-                    $this->hpapi->object->response->error   = HPAPI_DBA_STR_IN_COL_AUTO_INC.' "'.$column.'"';
-                    return false;
-                }
-                try {
-                    $count++;
-                    $this->hpapi->validation ($table->columns->{$column}->heading,$count,$value,$table->columns->{$column});
-                }
-                catch (\Exception $e) {
-                    $this->hpapi->object->response->error   = HPAPI_DBA_STR_IN_COL_VALID.': '.$e->getMessage();
-                    return false;
-                }
-                $this->db->addColumn ($column,$value);
-            }
-        }
-        catch (\Exception $e) {
-            $this->hpapi->object->response->error           = HPAPI_DBA_STR_QUERY_VALID.': '.$e->getMessage();
-            return false;
-        }
-        try {
-            $this->db->queryBuild ();
-        }
-        catch (\Exception $e) {
-            $this->hpapi->object->response->error           = HPAPI_DBA_STR_QUERY_BUILD.': '.$e->getMessage();
-            return false;
-        }
-        try {
-            $this->db->queryExecute ();
-        }
-        catch (\Exception $e) {
-            $this->hpapi->object->response->error           = HPAPI_DBA_STR_QUERY_EXEC.': '.$e->getMessage();
-            return false;
-        }
-        return true;
-    }
-
-    public function rowUpdate ($object) {
-        if (!$this->inputValidate($object)) {
-            return false;
-        }
-        if (!property_exists($object,'row') || !is_object($object->row)) {
-            throw new \Exception (HPAPI_DBA_STR_IN_ROW);
-            return false;
-        }
-        try {
-            $this->modelLoad ($object->model);
+            $this->loadRow ($object->row,$table->columns);
         }
         catch (\Exception $e) {
             throw new \Exception ($e->getMessage());
             return false;
         }
-        $this->db->setQueryType ('update');
-        $this->db->setTable ($object->table);
-        return "Getting there...";
+        try {
+            return $this->query ();
+        }
+        catch (\Exception $e) {
+            throw new \Exception ($e->getMessage());
+            return false;
+        }
     }
 
     public function rowsSelect ($object) {
         if (!$this->inputValidate($object)) {
+            throw new \Exception ($e->getMessage());
             return false;
         }
         try {
             $this->modelLoad ($object->model);
+            $this->db->setQueryType ('select');
+            $this->db->setTable ($object->table);
+            $table = $this->modelTable ($object->table);
+        }
+        return "Getting there...";
+    }
+
+    public function rowUpdate ($object) {
+        if (!$this->inputValidate($object)) {
+            throw new \Exception ($e->getMessage());
+            return false;
+        }
+        try {
+            $this->modelLoad ($object->model);
+            $this->db->setQueryType ('update');
+            $this->db->setTable ($object->table);
+            $table = $this->modelTable ($object->table);
         }
         catch (\Exception $e) {
             throw new \Exception ($e->getMessage());
             return false;
         }
-        $this->db->setQueryType ('select');
-        $this->db->setTable ($object->table);
+        try {
+            $this->loadRow ($object->row,$table->columns);
+        }
+        catch (\Exception $e) {
+            throw new \Exception ($e->getMessage());
+            return false;
+        }
+        try {
+            return $this->query ();
+        }
+        catch (\Exception $e) {
+            throw new \Exception ($e->getMessage());
+            return false;
+        }
     }
 
 // MANIPULATING PERMISSIONS
