@@ -504,6 +504,7 @@ BEGIN
    ,`hpapi_dba_table`.`description`
    ,`hpapi_dba_column`.`column`
    ,`INFORMATION_SCHEMA`.`KEY_COLUMN_USAGE`.`CONSTRAINT_NAME` IS NOT NULL AS `isPrimary`
+   ,`hpapi_dba_column`.`empty_allowed` AS `emptyAllowed`
    ,`hpapi_dba_column`.`heading`
    ,`hpapi_dba_column`.`hint`
    ,`hpapi_dba_column`.`describes_row` AS `describesRow`
@@ -559,6 +560,7 @@ BEGIN
    ,`fgn`.`REFERENCED_TABLE_NAME` AS `table`
    ,`hpapi_dba_table`.`title`
    ,`fgn`.`REFERENCED_COLUMN_NAME` AS `column`
+   ,`hpapi_dba_column`.`empty_allowed` AS `emptyAllowed`
    ,`hpapi_dba_column`.`heading`
    ,`hpapi_dba_column`.`column`=`pri`.`COLUMN_NAME` AS `isPrimary`
    ,`hpapi_dba_column`.`describes_row`!='0' AS `describesRow`
@@ -605,6 +607,7 @@ BEGIN
     `hpapi_dba_table`.`table`
    ,`hpapi_dba_column`.`column`
    ,`cols`.`COLUMN_KEY`='PRI' AS `isPrimary`
+   ,`hpapi_dba_column`.`empty_allowed` AS `emptyAllowed`
    ,`cols`.`EXTRA` LIKE '%auto_increment%' AS `isAutoIncrement`
    ,GROUP_CONCAT(
         `hpapi_dba_insert`.`usergroup`

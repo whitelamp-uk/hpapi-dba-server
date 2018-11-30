@@ -15,6 +15,12 @@ define ( 'HPAPI_DBA_STR_IN_COL_AUTO_INC',       '311 403 Cannot update auto-incr
 define ( 'HPAPI_DBA_STR_IN_COL_VALID',          '312 400 Input value is invalid'                                                    );
 
 
+define ( 'HPAPI_DBA_STR_QUERY_BUILD',           '331 500 Could not build dba query'                                                 );
+define ( 'HPAPI_DBA_STR_QUERY_PREP',            '332 500 Could not prepare dba query statement'                                     );
+define ( 'HPAPI_DBA_STR_QUERY_BIND',            '333 500 Could not bind to dba query statement'                                     );
+define ( 'HPAPI_DBA_STR_QUERY_EXEC',            '334 500 Could not execute dba query statement'                                     );
+
+
 define ( 'HPAPI_DBA_STR_GRANT_ALLOW',           '341 403 Grant was not allowed'                                                     );
 
 

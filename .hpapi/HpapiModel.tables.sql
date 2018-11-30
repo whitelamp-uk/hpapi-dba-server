@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS `hpapi_dba_column` (
   `model` varchar(64) CHARACTER SET ascii NOT NULL,
   `table` varchar(64) CHARACTER SET ascii NOT NULL,
   `column` varchar(64) CHARACTER SET ascii NOT NULL,
+  `empty_allowed` int(1) UNSIGNED NOT NULL,
   `heading` varchar(64) NOT NULL,
   `hint` varchar(255) NOT NULL,
   `pattern` varchar(64) CHARACTER SET ascii NOT NULL,

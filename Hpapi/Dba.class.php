@@ -224,40 +224,60 @@ class Dba {
             return false;
         }
         if (!property_exists($object,'row') || !is_object($object->row)) {
-            $this->hpapi->object->response->error       = HPAPI_DBA_STR_IN_ROW;
+            $this->hpapi->object->response->error           = HPAPI_DBA_STR_IN_ROW;
             return false;
         }
         if (!$this->modelLoad($object->model)) {
             return false;
         }
-        $table = $this->modelTable ($object->table);
-        $count = 0;
-        foreach ($object->row as $column=>$value) {
-            if (!property_exists($table->columns,$column)) {
-                $this->hpapi->object->response->error   = HPAPI_DBA_STR_IN_COL_EXIST.' "'.$column.'"';
-                return false;
-            }
-            if (!$table->columns->{$column}->mayUpdate) {
-                $this->hpapi->object->response->error   = HPAPI_DBA_STR_IN_COL_PRIV_UPDATE.' "'.$column.'"';
-                return false;
-            }
-            if ($table->columns->{$column}->isAutoIncrement) {
-                $this->hpapi->object->response->error   = HPAPI_DBA_STR_IN_COL_AUTO_INC.' "'.$column.'"';
-                return false;
-            }
-            try {
-                $count++;
-                $this->hpapi->validation ($table->columns->{$column}->heading,$count,$table->columns->{$column},$value);
-            }
-            catch (\Exception $e) {
-                $this->hpapi->object->response->error   = HPAPI_DBA_STR_IN_COL_VALID.': '.$e->getMessage();
-            }
-            $this->db->addColumn ($column,$value);
-        }
         $this->db->setQueryType ('insert');
         $this->db->setTable ($object->table);
-        $this->db->queryBuild ();
-        $this->db->queryExecute ();
+        $table = $this->modelTable ($object->table);
+        $count = 0;
+        try {
+            foreach ($object->row as $column=>$value) {
+                if (!property_exists($table->columns,$column)) {
+                    $this->hpapi->object->response->error   = HPAPI_DBA_STR_IN_COL_EXIST.' "'.$column.'"';
+                    return false;
+                }
+                if (!$table->columns->{$column}->mayUpdate) {
+                    $this->hpapi->object->response->error   = HPAPI_DBA_STR_IN_COL_PRIV_UPDATE.' "'.$column.'"';
+                    return false;
+                }
+                if ($table->columns->{$column}->isAutoIncrement) {
+                    $this->hpapi->object->response->error   = HPAPI_DBA_STR_IN_COL_AUTO_INC.' "'.$column.'"';
+                    return false;
+                }
+                try {
+                    $count++;
+                    $this->hpapi->validation ($table->columns->{$column}->heading,$count,$value,$table->columns->{$column});
+                }
+                catch (\Exception $e) {
+                    $this->hpapi->object->response->error   = HPAPI_DBA_STR_IN_COL_VALID.': '.$e->getMessage();
+                    return false;
+                }
+                $this->db->addColumn ($column,$value);
+            }
+        }
+        catch (\Exception $e) {
+            $this->hpapi->object->response->error           = HPAPI_DBA_STR_QUERY_VALID.': '.$e->getMessage();
+            return false;
+        }
+        try {
+            $this->db->queryBuild ();
+        }
+        catch (\Exception $e) {
+            $this->hpapi->object->response->error           = HPAPI_DBA_STR_QUERY_BUILD.': '.$e->getMessage();
+            return false;
+        }
+        try {
+            $this->db->queryExecute ();
+        }
+        catch (\Exception $e) {
+            $this->hpapi->object->response->error           = HPAPI_DBA_STR_QUERY_EXEC.': '.$e->getMessage();
+            return false;
+        }
+        return true;
     }
 
     public function rowUpdate ($object) {
