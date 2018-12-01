@@ -329,7 +329,13 @@ class Dba {
         if (!$this->modelLoad($object->model)) {
             return false;
         }
-        return $this->modelTable ($object->table);
+        $table = $this->modelTable ($object->table);
+        foreach ($table->columns as $c=>$column) {
+            if (defined($column->constraints)) {
+                $table->columns->{$c}->constraints = constant ($column->constraints);
+            }
+        }
+        return $table;
    }
 
     public function describeRelations ($dbName,$tableName,$weak=false) {
