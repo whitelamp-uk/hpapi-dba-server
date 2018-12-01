@@ -52,8 +52,6 @@ BEGIN
     ) AS `sql`
   FROM `information_schema`.`COLUMNS`
   WHERE `TABLE_SCHEMA`=dbName
-    AND `COLUMN_NAME`!='created'
-    AND `COLUMN_NAME`!='updated'
   ORDER BY `TABLE_NAME`,`ORDINAL_POSITION`
   ;
 END$$

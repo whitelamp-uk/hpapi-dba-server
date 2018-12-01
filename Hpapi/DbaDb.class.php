@@ -18,6 +18,7 @@ class DbaDb extends \Hpapi\Db {
                    ,'column'    => "\n`<table/>`.`<column/>`"
                    ,'from'      => "\nFROM `<table/>`"
                    ,'where'     => "\nWHERE"
+                   ,'restrict'  => "\n`<table/>`.`<column/>` <operator/> ?"
                 )
                ,'update'    => array (
                     'start'     => "UPDATE `<table/>` SET"
@@ -27,6 +28,7 @@ class DbaDb extends \Hpapi\Db {
                 )
             );
     private $queryType      = null;
+    private $restricts      = null;
     private $tableName      = null;
 
     public function __construct (\Hpapi\Hpapi $hpapi,$model) {
@@ -35,16 +37,35 @@ class DbaDb extends \Hpapi\Db {
 
     public function addColumn ($columnName,$value=null) {
         if ($this->columns===null) {
-            $this->columns = new \stdClass ();
+            $this->columns                  = new \stdClass ();
         }
-        $this->columns->{$columnName} = $this->pdoCast ($value);
+        $this->columns->{$columnName}       = $this->pdoCast ($value);
     }
 
     public function addPrimary ($columnName,$value=null) {
         if ($this->primary===null) {
-            $this->primary = new \stdClass ();
+            $this->primary                  = new \stdClass ();
         }
-        $this->primary->{$columnName} = $this->pdoCast ($value);
+        $this->primary->{$columnName}       = $this->pdoCast ($value);
+    }
+
+    public function addRestrict ($columnName,$restrict) {
+        if ($this->restricts===null) {
+            $this->restricts                = new \stdClass ();
+        }
+        $restrict->value                    = $this->pdoCast ($restrict->value);
+        $this->restricts->{$columnName}     = $restrict;
+    }
+
+    public function columnCount ( ) {
+        if (!$this->columns) {
+            return 0;
+        }
+        $count = 0;
+        foreach ($this->columns as $c) {
+            $count++;
+        }
+        return $count;
     }
 
     public function queryBuild ( ) {
@@ -52,19 +73,38 @@ class DbaDb extends \Hpapi\Db {
             $query  = str_replace ('<table/>',$this->tableName,$this->queryDefn[$this->queryType]['start']);
             $loop   = array ();
             foreach ($this->columns as $c=>$v) {
-                array_push ($loop,str_replace('<column/>',$c,$this->queryDefn[$this->queryType]['column']));
-                array_push ($this->params,$v);
+                $clause = str_replace ('<table/>',$this->tableName,$this->queryDefn[$this->queryType]['column']);
+                $clause = str_replace ('<column/>',$c,$clause);
+                array_push ($loop,$clause);
+                if ($this->queryType!='select') {
+                    array_push ($this->params,$v);
+                }
             }
             $query .= implode (",",$loop);
             if ($this->queryType=='select') {
-                return;
+                $query .= str_replace ('<table/>',$this->tableName,$this->queryDefn[$this->queryType]['from']);
+                $query .= $this->queryDefn[$this->queryType]['where'];
+                if ($this->restricts==null) {
+                    $query .= "\n1";
+                }
+                else {
+                    $loop   = array ();
+                    foreach ($this->restricts as $r=>$restrict) {
+                        $clause = str_replace ('<table/>',$this->tableName,$this->queryDefn[$this->queryType]['restrict']);
+                        $clause = str_replace ('<column/>',$r,$clause);
+                        $clause = str_replace ('<operator/>',$restrict->operator,$clause);
+                        array_push ($loop,$clause);
+                        array_push ($this->params,$restrict->value);
+                    }
+                    $query .= implode ("\nAND ",$loop);
+                }
             }
-            if ($this->queryType=='update') {
+            elseif ($this->queryType=='update') {
+                $query .= $this->queryDefn[$this->queryType]['where'];
                 if ($this->primary==null) {
                     throw new \Exception (HPAPI_DBA_STR_QUERY_PRI);
                     return false;
                 }
-                $query .= $this->queryDefn[$this->queryType]['where'];
                 $loop   = array ();
                 foreach ($this->primary as $p=>$v) {
                     array_push ($loop,str_replace('<primary/>',$p,$this->queryDefn[$this->queryType]['restrict']));

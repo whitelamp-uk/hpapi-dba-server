@@ -181,6 +181,10 @@ class Dba {
 
 // UTILITIES
 
+    protected function hasColumns ( ) {
+        return $this->db->columnCount ();
+    }
+
     protected function inputValidate ($object) {
         if (!is_object($object)) {
             throw new \Exception (HPAPI_DBA_STR_IN_OBJECT);
@@ -210,18 +214,26 @@ class Dba {
         }
     }
 
+    protected function loadColumns ($table) {
+        foreach ($table->columns as $c=>$column) {
+            if ($column->maySelect) {
+                $this->db->addColumn ($c,null);
+            }
+        }
+    }
+
     protected function loadPrimary ($primary,$columns) {
         $count = 0;
         try {
             foreach ($columns as $c=>$column) {
                 if ($column->isPrimary && !property_exists($primary,$c)) {
-                    throw new \Exception (HPAPI_DBA_STR_IN_PRI_EXIST.' "'.$c.'"');
+                    throw new \Exception (HPAPI_DBA_STR_IN_PRI_GIVEN.' "'.$c.'"');
                     return false;
                 }
             }
             foreach ($primary as $column=>$value) {
                 if (!property_exists($columns,$column)) {
-                    throw new \Exception (HPAPI_DBA_STR_IN_COL_EXIST.' "'.$column.'"');
+                    throw new \Exception (HPAPI_DBA_STR_IN_PRI_EXIST.' "'.$column.'"');
                     return false;
                 }
                 try {
@@ -233,6 +245,29 @@ class Dba {
                     return false;
                 }
                 $this->db->addPrimary ($column,$value);
+            }
+        }
+        catch (\Exception $e) {
+            throw new \Exception ($e->getMessage());
+            return false;
+        }
+        return true;
+    }
+
+    protected function loadRestricts ($restricts,$columns) {
+        $count = 0;
+        try {
+            foreach ($restricts as $column=>$restrict) {
+                $count++;
+                if (!is_object($restricts->{$column})) {
+                    throw new \Exception (HPAPI_DBA_STR_IN_RESTRICT.' ('.$count.')');
+                    return false;
+                }
+                if (!property_exists($columns,$column)) {
+                    throw new \Exception (HPAPI_DBA_STR_IN_RESTRICT_EXIST.' "'.$column.'"');
+                    return false;
+                }
+                $this->db->addRestrict ($column,$restrict);
             }
         }
         catch (\Exception $e) {
@@ -285,6 +320,57 @@ class Dba {
         return false;
     }
 
+    // DESCRIPTION
+
+    public function describeTable ($object) {
+        if (!$this->inputValidate($object)) {
+            return false;
+        }
+        if (!$this->modelLoad($object->model)) {
+            return false;
+        }
+        return $this->modelTable ($object->table);
+   }
+
+    public function describeRelations ($dbName,$tableName,$weak=false) {
+        try {
+            if ($weak) {
+                $columns            = $this->hpapi->dbCall (
+                    'hpapiDbaColumnsWeak'
+                   ,$dbName
+                   ,$tableName
+                );
+            }
+            else {
+                $columns            = $this->hpapi->dbCall (
+                    'hpapiDbaColumnsStrong'
+                   ,$dbName
+                   ,$tableName
+                );
+            }
+            $columns                = $this->hpapi->parse2D ($columns);
+        }
+        catch (\Exception $e) {
+            throw new \Exception ($e->getMessage());
+            return false;
+        }
+        $relations = new \stdClass ();
+        foreach ($columns as $c) {
+            if (!property_exists($relations,$c->table)) {
+                $relations->{$c->table}                 = new \stdClass ();
+                $relations->{$c->table}->model          = $c->model;
+                $relations->{$c->table}->table          = $c->table;
+                $relations->{$c->table}->title          = $c->title;
+                $relations->{$c->table}->description    = $c->description;
+                $relations->{$c->table}->columns        = array ();
+            }
+            unset ($c->title);
+            unset ($c->description);
+            array_push ($relations->{$c->table}->columns,$c);
+        }
+        return $relations;
+    }
+
 // DATA MANIPULATION
 
     public function rowInsert ($object) {
@@ -327,8 +413,8 @@ class Dba {
             throw new \Exception ($e->getMessage());
             return false;
         }
-        if (!property_exists($object,'restrict') || !is_array($object->restrict)) {
-            throw new \Exception (HPAPI_DBA_STR_IN_RESTRICT);
+        if (!property_exists($object,'restricts') || !is_object($object->restricts)) {
+            throw new \Exception (HPAPI_DBA_STR_IN_RESTRICTS);
             return false;
         }
         try {
@@ -341,7 +427,25 @@ class Dba {
             throw new \Exception ($e->getMessage());
             return false;
         }
-        return "Getting there...";
+        try {
+            $this->loadColumns ($table);
+            if (!$this->hasColumns()) {
+                throw new \Exception (HPAPI_DBA_STR_COLS_ALLOW);
+                return false;
+            }
+            $this->loadRestricts ($object->restricts,$table->columns);
+        }
+        catch (\Exception $e) {
+            throw new \Exception ($e->getMessage());
+            return false;
+        }
+        try {
+            return $this->query ();
+        }
+        catch (\Exception $e) {
+            throw new \Exception ($e->getMessage());
+            return false;
+        }
     }
 
     public function rowUpdate ($object) {
@@ -808,57 +912,6 @@ class Dba {
             return false;
         }
         return $updates;
-    }
-
-    // DESCRIBE DATA STRUCTURE
-
-    public function describeTable ($object) {
-        if (!$this->inputValidate($object)) {
-            return false;
-        }
-        if (!$this->modelLoad($object->model)) {
-            return false;
-        }
-        return $this->modelTable ($object->table);
-   }
-
-    public function describeRelations ($dbName,$tableName,$weak=false) {
-        try {
-            if ($weak) {
-                $columns            = $this->hpapi->dbCall (
-                    'hpapiDbaColumnsWeak'
-                   ,$dbName
-                   ,$tableName
-                );
-            }
-            else {
-                $columns            = $this->hpapi->dbCall (
-                    'hpapiDbaColumnsStrong'
-                   ,$dbName
-                   ,$tableName
-                );
-            }
-            $columns                = $this->hpapi->parse2D ($columns);
-        }
-        catch (\Exception $e) {
-            throw new \Exception ($e->getMessage());
-            return false;
-        }
-        $relations = new \stdClass ();
-        foreach ($columns as $c) {
-            if (!property_exists($relations,$c->table)) {
-                $relations->{$c->table}                 = new \stdClass ();
-                $relations->{$c->table}->model          = $c->model;
-                $relations->{$c->table}->table          = $c->table;
-                $relations->{$c->table}->title          = $c->title;
-                $relations->{$c->table}->description    = $c->description;
-                $relations->{$c->table}->columns        = array ();
-            }
-            unset ($c->title);
-            unset ($c->description);
-            array_push ($relations->{$c->table}->columns,$c);
-        }
-        return $relations;
     }
 
 }

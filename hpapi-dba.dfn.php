@@ -7,17 +7,20 @@ define ( 'HPAPI_DBA_STR_COLS_WRITE',            '303 500 Could not write model c
 define ( 'HPAPI_DBA_STR_IN_OBJECT',             '304 400 Input argument was not an object'                                          );
 define ( 'HPAPI_DBA_STR_IN_MODEL',              '305 400 Input object missing model'                                                );
 define ( 'HPAPI_DBA_STR_IN_TABLE',              '306 400 Input object missing table'                                                );
-define ( 'HPAPI_DBA_STR_IN_ROW',                '307 400 Input object missing row object'                                           );
-define ( 'HPAPI_DBA_STR_IN_RESTRICT',           '308 400 Input object missing restrict object'                                      );
-define ( 'HPAPI_DBA_STR_IN_PRI',                '309 400 Input object missing primary object'                                       );
-define ( 'HPAPI_DBA_STR_IN_COL_EXIST',          '310 400 Column does not exist'                                                     );
-define ( 'HPAPI_DBA_STR_IN_COL_PRIV_UPDATE',    '311 403 Column update denied'                                                      );
-define ( 'HPAPI_DBA_STR_IN_COL_AUTO_INC',       '312 403 Cannot update auto-increment column'                                       );
-define ( 'HPAPI_DBA_STR_IN_COL_VALID',          '313 400 Column value is invalid'                                                   );
-define ( 'HPAPI_DBA_STR_IN_PRI_EXIST',          '314 400 Primary column not given'                                                  );
-define ( 'HPAPI_DBA_STR_IN_PRI_VALID',          '315 400 Primary column value is invalid'                                           );
-define ( 'HPAPI_DBA_STR_IN_VALIDATE',           '316 500 Could not validate input object'                                           );
-define ( 'HPAPI_DBA_STR_IN_LOAD',               '317 500 Could not load input object'                                               );
+define ( 'HPAPI_DBA_STR_IN_LOAD',               '307 500 Could not load input object'                                               );
+define ( 'HPAPI_DBA_STR_IN_ROW',                '308 400 Input object missing row object'                                           );
+define ( 'HPAPI_DBA_STR_IN_RESTRICTS',          '309 400 Input object missing restrict object'                                      );
+define ( 'HPAPI_DBA_STR_IN_RESTRICT',           '310 400 Input restrict is not an object'                                           );
+define ( 'HPAPI_DBA_STR_IN_PRI',                '311 400 Input object missing primary object'                                       );
+define ( 'HPAPI_DBA_STR_IN_COL_EXIST',          '312 400 Column does not exist'                                                     );
+define ( 'HPAPI_DBA_STR_IN_COL_PRIV_UPDATE',    '313 403 Column update denied'                                                      );
+define ( 'HPAPI_DBA_STR_IN_COL_AUTO_INC',       '314 403 Cannot update auto-increment column'                                       );
+define ( 'HPAPI_DBA_STR_IN_COL_VALID',          '315 400 Column value is invalid'                                                   );
+define ( 'HPAPI_DBA_STR_IN_PRI_GIVEN',          '316 400 Primary column not given'                                                  );
+define ( 'HPAPI_DBA_STR_IN_PRI_EXIST',          '317 400 Primary column does not exist'                                             );
+define ( 'HPAPI_DBA_STR_IN_PRI_VALID',          '318 400 Primary column value is invalid'                                           );
+define ( 'HPAPI_DBA_STR_IN_RESTRICT_EXIST',     '319 400 Restrict column does not exist'                                            );
+define ( 'HPAPI_DBA_STR_COLS_ALLOW',            '320 403 No allowed columns'                                                        );
 
 
 define ( 'HPAPI_DBA_STR_QUERY_BUILD',           '331 500 Could not build dba query'                                                 );
