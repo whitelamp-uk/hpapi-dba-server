@@ -4,25 +4,30 @@ namespace Hpapi;
 
 class DbaDb extends \Hpapi\Db {
 
-    private $query;
-    private $queryType;
-    private $queryDefn = array (
-                'insert' => array (
-                    'start' => "INSERT INTO `<table/>` SET"
-                   ,'column' => "\n`<column/>`=?"
+    private $columns        = null;
+    private $params         = array ();
+    private $primary        = null;
+    private $query          = null;
+    private $queryDefn      = array (
+                'insert'    => array (
+                    'start'     => "INSERT INTO `<table/>` SET"
+                   ,'column'    => "\n`<column/>`=?"
                 )
-               ,'select' => array (
-                    'start' => "SELECT <columns/> FROM <table/>"
+               ,'select'    => array (
+                    'start'     => "SELECT"
+                   ,'column'    => "\n`<table/>`.`<column/>`"
+                   ,'from'      => "\nFROM `<table/>`"
+                   ,'where'     => "\nWHERE"
                 )
-               ,'update' => array (
-                    'start' => "UPDATE <table> SET"
-                   ,'column' => "\n`<column/>`=?"
-                   ,'where' => "WHERE <primaries/>"
+               ,'update'    => array (
+                    'start'     => "UPDATE `<table/>` SET"
+                   ,'column'    => "\n`<column/>`=?"
+                   ,'where'     => "\nWHERE"
+                   ,'restrict'  => "\n`<primary/>`=?"
                 )
             );
-    private $tableName;
-    private $columns = null;
-    private $primary = null;
+    private $queryType      = null;
+    private $tableName      = null;
 
     public function __construct (\Hpapi\Hpapi $hpapi,$model) {
         parent::__construct ($hpapi,$model);
@@ -48,8 +53,9 @@ class DbaDb extends \Hpapi\Db {
             $loop   = array ();
             foreach ($this->columns as $c=>$v) {
                 array_push ($loop,str_replace('<column/>',$c,$this->queryDefn[$this->queryType]['column']));
+                array_push ($this->params,$v);
             }
-            $query .= implode (',',$loop);
+            $query .= implode (",",$loop);
             if ($this->queryType=='select') {
                 return;
             }
@@ -58,7 +64,13 @@ class DbaDb extends \Hpapi\Db {
                     throw new \Exception (HPAPI_DBA_STR_QUERY_PRI);
                     return false;
                 }
-die ("The next bit...");
+                $query .= $this->queryDefn[$this->queryType]['where'];
+                $loop   = array ();
+                foreach ($this->primary as $p=>$v) {
+                    array_push ($loop,str_replace('<primary/>',$p,$this->queryDefn[$this->queryType]['restrict']));
+                    array_push ($this->params,$v);
+                }
+                $query .= implode ("\nAND ",$loop);
             }
             $this->query = $query;
         }
@@ -79,7 +91,7 @@ die ("The next bit...");
             return false;
         }
         $i = 0;
-        foreach ($this->columns as $param) {
+        foreach ($this->params as $param) {
             // Bind value to placeholder
             $i++;
             try {
@@ -97,7 +109,7 @@ die ("The next bit...");
         catch (\PDOException $e) {
             // Execution failed
             $this->hpapi->diagnostic (HPAPI_DBA_STR_QUERY_EXEC.' - '.$e->getMessage());
-            throw new \Exception ($e->getMessage());
+            throw new \Exception (HPAPI_DBA_STR_QUERY_EXEC);
             return false;
         }
         try {

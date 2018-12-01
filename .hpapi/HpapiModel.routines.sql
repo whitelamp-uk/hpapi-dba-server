@@ -95,7 +95,7 @@ CREATE PROCEDURE `hpapiDbaMembershipsForUser`(
 BEGIN
   SELECT
     `hpapi_usergroup`.`usergroup` AS `usergroup`
-    `hpapi_usergroup`.`name` AS `usergroupName`
+   ,`hpapi_usergroup`.`name` AS `usergroupName`
    ,`hpapi_usergroup`.`unotes` AS `usergroupNotes`
    ,`hpapi_usergroup`.`level` AS `usergroupLevel`
    ,`hpapi_level`.`name` AS `levelName`
@@ -114,8 +114,8 @@ CREATE PROCEDURE `hpapiDbaMembershipsForUsergroup`(
 )
 BEGIN
   SELECT
-   ,`hpapi_user`.`id`
-    `hpapi_user`.`active`
+    `hpapi_user`.`id`
+   ,`hpapi_user`.`active`
    ,`hpapi_user`.`key`
    ,`hpapi_user`.`name`
    ,`hpapi_user`.`notes`
@@ -334,29 +334,29 @@ END$$
 
 DROP PROCEDURE IF EXISTS `hpapiDbaInsertInsert`$$
 CREATE PROCEDURE `hpapiDbaInsertInsert`(
-  IN        `model` varchar(64) CHARSET ascii
- ,IN        `table` varchar(64) CHARSET ascii
+  IN        `modelName` varchar(64) CHARSET ascii
+ ,IN        `tableName` varchar(64) CHARSET ascii
  ,IN        `usergroup` varchar(64) CHARSET ascii
 )
 BEGIN
   INSERT IGNORE INTO `hpapi_dba_insert`
   SET
-    `model`=model
-   ,`table`=table
+    `model`=modelName
+   ,`table`=tableName
    ,`usergroup`=usergroup
   ;
 END$$
 
 DROP PROCEDURE IF EXISTS `hpapiDbaInsertDelete`$$
 CREATE PROCEDURE `hpapiDbaInsertDelete`(
-  IN        `model` varchar(64) CHARSET ascii
- ,IN        `table` varchar(64) CHARSET ascii
+  IN        `modelName` varchar(64) CHARSET ascii
+ ,IN        `tableName` varchar(64) CHARSET ascii
  ,IN        `usergroup` varchar(64) CHARSET ascii
 )
 BEGIN
   DELETE FROM `hpapi_dba_insert`
-  WHERE `model`=model
-    AND `table`=table
+  WHERE `model`=modelName
+    AND `table`=tableName
     AND `usergroup`=usergroup
   ;
 END$$
@@ -383,33 +383,33 @@ END$$
 
 DROP PROCEDURE IF EXISTS `hpapiDbaSelectInsert`$$
 CREATE PROCEDURE `hpapiDbaSelectInsert`(
-  IN        `model` varchar(64) CHARSET ascii
- ,IN        `table` varchar(64) CHARSET ascii
- ,IN        `column` varchar(64) CHARSET ascii
+  IN        `modelName` varchar(64) CHARSET ascii
+ ,IN        `tableName` varchar(64) CHARSET ascii
+ ,IN        `columnName` varchar(64) CHARSET ascii
  ,IN        `usergroup` varchar(64) CHARSET ascii
 )
 BEGIN
   INSERT IGNORE INTO `hpapi_dba_select`
   SET
-    `model`=model
-   ,`table`=table
-   ,`column`=column
+    `model`=modelName
+   ,`table`=tableName
+   ,`column`=columnName
    ,`usergroup`=usergroup
   ;
 END$$
 
 DROP PROCEDURE IF EXISTS `hpapiDbaSelectDelete`$$
 CREATE PROCEDURE `hpapiDbaSelectDelete`(
-  IN        `model` varchar(64) CHARSET ascii
- ,IN        `table` varchar(64) CHARSET ascii
- ,IN        `column` varchar(64) CHARSET ascii
+  IN        `modelName` varchar(64) CHARSET ascii
+ ,IN        `tableName` varchar(64) CHARSET ascii
+ ,IN        `columnName` varchar(64) CHARSET ascii
  ,IN        `usergroup` varchar(64) CHARSET ascii
 )
 BEGIN
   DELETE FROM `hpapi_dba_select`
-  WHERE `model`=model
-    AND `table`=table
-    AND `column`=column
+  WHERE `model`=modelName
+    AND `table`=tableName
+    AND `column`=columnName
     AND `usergroup`=usergroup
   ;
 END$$
@@ -437,33 +437,33 @@ END$$
 
 DROP PROCEDURE IF EXISTS `hpapiDbaUpdateInsert`$$
 CREATE PROCEDURE `hpapiDbaUpdateInsert`(
-  IN        `model` varchar(64) CHARSET ascii
- ,IN        `table` varchar(64) CHARSET ascii
- ,IN        `column` varchar(64) CHARSET ascii
+  IN        `modelName` varchar(64) CHARSET ascii
+ ,IN        `tableName` varchar(64) CHARSET ascii
+ ,IN        `columnName` varchar(64) CHARSET ascii
  ,IN        `usergroup` varchar(64) CHARSET ascii
 )
 BEGIN
   INSERT IGNORE INTO `hpapi_dba_update`
   SET
-    `model`=model
-   ,`table`=table
-   ,`column`=column
+    `model`=modelName
+   ,`table`=tableName
+   ,`column`=columnName
    ,`usergroup`=usergroup
   ;
 END$$
 
 DROP PROCEDURE IF EXISTS `hpapiDbaUpdateDelete`$$
 CREATE PROCEDURE `hpapiDbaUpdateDelete`(
-  IN        `model` varchar(64) CHARSET ascii
- ,IN        `table` varchar(64) CHARSET ascii
- ,IN        `column` varchar(64) CHARSET ascii
+  IN        `modelName` varchar(64) CHARSET ascii
+ ,IN        `tableName` varchar(64) CHARSET ascii
+ ,IN        `columnName` varchar(64) CHARSET ascii
  ,IN        `usergroup` varchar(64) CHARSET ascii
 )
 BEGIN
   DELETE FROM `hpapi_dba_update`
-  WHERE `model`=model
-    AND `table`=table
-    AND `column`=column
+  WHERE `model`=modelName
+    AND `table`=tableName
+    AND `column`=columnName
     AND `usergroup`=usergroup
   ;
 END$$

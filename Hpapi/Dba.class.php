@@ -187,11 +187,7 @@ class Dba {
             return false;
         }
         if (!property_exists($object,'table')) {
-            thrown new \Exception (HPAPI_DBA_STR_IN_TABLE);
-            return false;
-        }
-        if (!property_exists($object,'row') || !is_object($object->row)) {
-            throw new \Exception (HPAPI_DBA_STR_IN_ROW);
+            throw new \Exception (HPAPI_DBA_STR_IN_TABLE);
             return false;
         }
         return true;
@@ -202,14 +198,14 @@ class Dba {
             $this->db->queryBuild ();
         }
         catch (\Exception $e) {
-            throw new \Exception (HPAPI_DBA_STR_QUERY_BUILD.': '.$e->getMessage());
+            throw new \Exception ($e->getMessage());
             return false;
         }
         try {
             return $this->db->queryExecute ();
         }
         catch (\Exception $e) {
-            throw new \Exception (HPAPI_DBA_STR_QUERY_EXEC.': '.$e->getMessage());
+            throw new \Exception ($e->getMessage());
             return false;
         }
     }
@@ -217,8 +213,14 @@ class Dba {
     protected function loadPrimary ($primary,$columns) {
         $count = 0;
         try {
+            foreach ($columns as $c=>$column) {
+                if ($column->isPrimary && !property_exists($primary,$c)) {
+                    throw new \Exception (HPAPI_DBA_STR_IN_PRI_EXIST.' "'.$c.'"');
+                    return false;
+                }
+            }
             foreach ($primary as $column=>$value) {
-                if (!property_exists($table->columns,$column)) {
+                if (!property_exists($columns,$column)) {
                     throw new \Exception (HPAPI_DBA_STR_IN_COL_EXIST.' "'.$column.'"');
                     return false;
                 }
@@ -227,14 +229,14 @@ class Dba {
                     $this->hpapi->validation ($columns->{$column}->heading,$count,$value,$columns->{$column});
                 }
                 catch (\Exception $e) {
-                    throw new \Exception (HPAPI_DBA_STR_IN_COL_VALID.': '.$e->getMessage());
+                    throw new \Exception (HPAPI_DBA_STR_IN_PRI_VALID.': '.$e->getMessage());
                     return false;
                 }
                 $this->db->addPrimary ($column,$value);
             }
         }
         catch (\Exception $e) {
-            throw new \Exception (HPAPI_DBA_STR_QUERY_VALID.': '.$e->getMessage());
+            throw new \Exception ($e->getMessage());
             return false;
         }
         return true;
@@ -244,15 +246,15 @@ class Dba {
         $count = 0;
         try {
             foreach ($row as $column=>$value) {
-                if (!property_exists($table->columns,$column)) {
+                if (!property_exists($columns,$column)) {
                     throw new \Exception (HPAPI_DBA_STR_IN_COL_EXIST.' "'.$column.'"');
                     return false;
                 }
-                if (!$table->columns->{$column}->mayUpdate) {
+                if (!$columns->{$column}->mayUpdate) {
                     throw new \Exception (HPAPI_DBA_STR_IN_COL_PRIV_UPDATE.' "'.$column.'"');
                     return false;
                 }
-                if ($table->columns->{$column}->isAutoIncrement) {
+                if ($columns->{$column}->isAutoIncrement) {
                     throw new \Exception (HPAPI_DBA_STR_IN_COL_AUTO_INC.' "'.$column.'"');
                     return false;
                 }
@@ -268,7 +270,7 @@ class Dba {
             }
         }
         catch (\Exception $e) {
-            throw new \Exception (HPAPI_DBA_STR_QUERY_VALID.': '.$e->getMessage());
+            throw new \Exception (HPAPI_DBA_STR_IN_LOAD.': '.$e->getMessage());
             return false;
         }
         return true;
@@ -288,6 +290,10 @@ class Dba {
     public function rowInsert ($object) {
         if (!$this->inputValidate($object)) {
             throw new \Exception ($e->getMessage());
+            return false;
+        }
+        if (!property_exists($object,'row') || !is_object($object->row)) {
+            throw new \Exception (HPAPI_DBA_STR_IN_ROW);
             return false;
         }
         try {
@@ -321,11 +327,19 @@ class Dba {
             throw new \Exception ($e->getMessage());
             return false;
         }
+        if (!property_exists($object,'restrict') || !is_array($object->restrict)) {
+            throw new \Exception (HPAPI_DBA_STR_IN_RESTRICT);
+            return false;
+        }
         try {
             $this->modelLoad ($object->model);
             $this->db->setQueryType ('select');
             $this->db->setTable ($object->table);
             $table = $this->modelTable ($object->table);
+        }
+        catch (\Exception $e) {
+            throw new \Exception ($e->getMessage());
+            return false;
         }
         return "Getting there...";
     }
@@ -333,6 +347,14 @@ class Dba {
     public function rowUpdate ($object) {
         if (!$this->inputValidate($object)) {
             throw new \Exception ($e->getMessage());
+            return false;
+        }
+        if (!property_exists($object,'row') || !is_object($object->row)) {
+            throw new \Exception (HPAPI_DBA_STR_IN_ROW);
+            return false;
+        }
+        if (!property_exists($object,'primary') || !is_object($object->primary)) {
+            throw new \Exception (HPAPI_DBA_STR_IN_PRI);
             return false;
         }
         try {
@@ -347,6 +369,7 @@ class Dba {
         }
         try {
             $this->loadRow ($object->row,$table->columns);
+            $this->loadPrimary ($object->primary,$table->columns);
         }
         catch (\Exception $e) {
             throw new \Exception ($e->getMessage());
