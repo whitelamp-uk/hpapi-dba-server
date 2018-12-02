@@ -7,5 +7,5 @@ define ( 'HPAPI_DBA_COLS_DIR',              HPAPI_DIR_CONFIG.'/whitelamp-uk/hpap
 define ( 'HPAPI_DBA_COLS_FILE_SUFFIX',      '.array.php'                                                                            );
 
 // Database extension
-require_once HPAPI_DIR_HPAPI.'/whitelamp-uk/hpapi-dba/Hpapi/DbaDb.class.php';
+require_once HPAPI_DIR_HPAPI.'/whitelamp-uk/hpapi-dba-server/Hpapi/DbaDb.class.php';
 
