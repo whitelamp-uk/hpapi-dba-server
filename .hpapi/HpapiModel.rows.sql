@@ -4,8 +4,8 @@ SET time_zone = '+00:00';
 SET foreign_key_checks = 0;
 SET sql_mode = 'NO_AUTO_VALUE_ON_ZERO';
 
-INSERT IGNORE INTO `hpapi_package` (`vendor`, `package`, `notes`) VALUES
-('whitelamp-uk',	'hpapi-dba-server',	'Hpapi Dba data model administration tools.');
+INSERT IGNORE INTO `hpapi_package` (`vendor`, `package`, `requires_key`, `notes`) VALUES
+('whitelamp-uk',	'hpapi-dba-server',	0,	'Hpapi Dba data model administration tools.');
 
 INSERT IGNORE INTO `hpapi_method` (`vendor`, `package`, `class`, `method`, `label`, `notes`) VALUES
 ('whitelamp-uk',	'hpapi-dba-server',	'\\Hpapi\\Dba',	'describeTable',	'Get table definition object',	''),
