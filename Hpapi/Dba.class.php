@@ -311,9 +311,9 @@ class Dba {
         return true;
     }
 
-    protected function usergroupMatch ($usergroups) {
-        foreach ($this->hpapi->usergroups as $g) {
-            if (in_array($g['usergroup'],$usergroups)) {
+    protected function usergroupMatch ($groups) {
+        foreach ($groups as $g) {
+            if ($this->hpapi->groupAllowed($g['usergroup'])) {
                 return true;
             }
         }
